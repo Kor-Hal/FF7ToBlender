@@ -463,13 +463,13 @@ class LGPFile:
         return self.files[start_pos:start_pos + length]
 
 class LZSSFile:
-    def __init__(self, filepath):
+    def __init__(self, data):
         self.filepath = filepath
         self.uncompressedData = bytearray()
 
         with open(self.filepath, "rb") as f:
             # Header is 4 bytes defining the file's length, not including itself
-            header = struct.unpack("<I", f.read(4))[0]
+            header, = struct.unpack("<I", f.read(4))
             if os.path.getsize(self.filepath) - 4 != header:
                 raise ValueError("Not a valid LZSS file : File size {} doesn't match header's information {}".format(os.path.getsize(self.filepath), header + 4))
             
@@ -518,6 +518,126 @@ class LZSSFile:
     @uncompressedData.setter
     def uncompressedData(self, uncompressedData):
         self.__uncompressedData = uncompressedData
+
+class FieldModule:
+    def __init__(self, data):
+        self.sections = { k : None for k in range(1,10) } # Field Module always has 9 sections
+
+        _, nbSections, sec1off, sec2off, sec3off, sec4off, sec5off, sec6off, sec7off, sec8off, sec9off = struct.unpack("<H10I", data[:42])
+        if nbSections != 9:
+            raise ValueError("The Field Module must have exactly 9 sections ({} encountered)".format(nbSections))
+        
+        for i in range(1,10):
+            secOff = eval("sec{}off".format(i)) # Getting the offset for the current section
+            secLen, = struct.unpack("<I", data[secOff:secOff + 4]) # The first 4 bytes are the length of the section
+            secOff += 4 # Getting the real starting offset for the section
+            self.sections[i] = data[secOff:secOff + secLen] # Storing binary data for this section
+
+        # Only Section 3 is of interest here but using generic code in case of reuse later
+        self.sections[3] = self.ModelLoader(self.sections[3])
+
+    @property
+    def sections(self):
+        return self.__sections
+
+    @sections.setter
+    def sections(self, sections):
+        self.__sections = sections
+
+    class ModelLoader:
+        def __init__(self, data):
+            _, nbModels, _ = struct.unpack("<3H", data[:6]) # Header
+            offset = 6 # Position after header
+            self.models = {}
+
+            for _ in range(nbModels):
+                modelNameSize, = struct.unpack("<H", data[offset:offset + 2])
+                offset += 2
+                modelName, _, skeletonFile, _, nbAnim, lightColor1, _, lightColor2, _, lightColor3, _, globalLightColor = struct.unpack("<{}sH8s4sH3s6s3s6s3s6s3s".format(modelNameSize), data[offset:offset + modelNameSize + 46])
+                offset += modelNameSize + 46
+                anim = []
+                for _ in range(nbAnim):
+                    animNameSize, = struct.unpack("<H", data[offset:offset + 2])
+                    offset += 2
+                    animFile, = struct.unpack("<{}s".format(animNameSize), data[offset:offset + animNameSize])
+                    offset += animNameSize + 2 # There are 2 unused bytes at the end of each animation
+                    anim.append(os.path.splitext(animFile.decode("utf-8"))[0] + ".a")
+                model = self.Model(modelName.decode("utf-8"), skeletonFile.decode("utf-8"), lightColor1, lightColor2, lightColor3, globalLightColor, anim)
+                self.models[modelName.decode("utf-8")] = model
+
+        @property
+        def models(self):
+            return self.__models
+
+        @models.setter
+        def models(self, models):
+            self.__models = models
+
+        class Model:
+            def __init__(self, name, skeletonFile, lightColor1, lightColor2, lightColor3, globalLightColor, animations):
+                self.name = name
+                self.skeletonFile = skeletonFile
+                self.lightColor1 = lightColor1
+                self.lightColor2 = lightColor2
+                self.lightColor3 = lightColor3
+                self.globalLightColor = globalLightColor
+                self.animations = animations
+
+            @property
+            def name(self):
+                return self.__name
+
+            @name.setter
+            def name(self, name):
+                self.__name = name
+
+            @property
+            def skeletonFile(self):
+                return self.__skeletonFile
+
+            @skeletonFile.setter
+            def skeletonFile(self, skeletonFile):
+                self.__skeletonFile = skeletonFile
+
+            @property
+            def lightColor1(self):
+                return self.__lightColor1
+
+            @lightColor1.setter
+            def lightColor1(self, lightColor1):
+                self.__lightColor1 = lightColor1
+
+            @property
+            def lightColor2(self):
+                return self.__lightColor2
+
+            @lightColor2.setter
+            def lightColor2(self, lightColor2):
+                self.__lightColor2 = lightColor2
+
+            @property
+            def lightColor3(self):
+                return self.__lightColor3
+
+            @lightColor3.setter
+            def lightColor3(self, lightColor3):
+                self.__lightColor3 = lightColor3
+
+            @property
+            def globalLightColor(self):
+                return self.__globalLightColor
+
+            @globalLightColor.setter
+            def globalLightColor(self, globalLightColor):
+                self.__globalLightColor = globalLightColor
+
+            @property
+            def animations(self):
+                return self.__animations
+
+            @animations.setter
+            def animations(self, animations):
+                self.__animations = animations
 
 class HRCSkeleton:
     def __init__(self, filename, name, nb_bones):
