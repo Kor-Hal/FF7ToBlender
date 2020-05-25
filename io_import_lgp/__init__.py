@@ -414,26 +414,32 @@ SKELETONS_NAMES = {
 # Classes
 
 class LGPFile:
-    def __init__(self, filepath):
+    def __init__(self, data):
         self.toc = {}
+        offset = 12 # Ignoring the first 12 bytes (File creator)
+        nb_files, = struct.unpack("<I", data[offset:offset + 4])
+        offset += 4
+        if nb_files > 0: # If we have at least one file, we process the first one's information outside of the loop
+            filename, first_offset = struct.unpack("<20sI", data[offset:offset + 24])
+            filename = filename.decode("utf-8").rstrip('\x00')
+            offset += 24
+            self.toc[filename] = first_offset
+            offset += 3 # Avoiding useless information
+        for _ in range(nb_files - 1): # Now we process all remaining files
+            filename, file_offset = struct.unpack("<20sI", data[offset:offset + 24])
+            filename = filename.decode("utf-8").rstrip('\x00')
+            offset += 24
+            if file_offset < first_offset:
+                first_offset = file_offset
+            self.toc[filename] = file_offset
+            offset += 3 # Avoiding useless information
+        self.toc = { k : v - first_offset for k, v in self.toc.items() } # Modify every offset to remove header and CRC length
+        self.files = data[first_offset:] # Storing all files' data
+
+    @classmethod
+    def fromFile(cls, filepath):
         with open(filepath, "rb") as f:
-            f.seek(12, 1) # Ignoring the first 12 bytes (File creator)
-            self.nb_files = int.from_bytes(f.read(4), byteorder="little")
-            if self.nb_files > 0: # If we have at least one file, we process the first one's information outside of the loop
-                filename = f.read(20).decode("utf-8").rstrip('\x00')
-                first_offset = int.from_bytes(f.read(4), byteorder="little")
-                self.toc[filename] = first_offset
-                f.seek(3, 1) # Avoiding useless information
-            for _ in range(self.nb_files - 1): # Now we process all remaining files
-                filename = f.read(20).decode("utf-8").rstrip('\x00')
-                file_offset = int.from_bytes(f.read(4), byteorder="little")
-                if file_offset < first_offset:
-                    first_offset = file_offset
-                self.toc[filename] = file_offset
-                f.seek(3, 1) # Avoiding useless information
-            self.toc = { k : v - first_offset for k, v in self.toc.items() } # Modify every offset to remove header and CRC length
-            f.seek(first_offset, 0) # Moving to the first file description
-            self.files = f.read() # Storing all files' data
+            return cls(f.read())
 
     @property
     def toc(self):
@@ -464,52 +470,51 @@ class LGPFile:
 
 class LZSSFile:
     def __init__(self, data):
-        self.filepath = filepath
         self.uncompressedData = bytearray()
 
-        with open(self.filepath, "rb") as f:
-            # Header is 4 bytes defining the file's length, not including itself
-            header, = struct.unpack("<I", f.read(4))
-            if os.path.getsize(self.filepath) - 4 != header:
-                raise ValueError("Not a valid LZSS file : File size {} doesn't match header's information {}".format(os.path.getsize(self.filepath), header + 4))
+        # Header is 4 bytes defining the file's length, not including itself
+        header, = struct.unpack("<I", data[:4])
+        file_offset = 4
+        if len(data) - 4 != header:
+            raise ValueError("Not a valid LZSS file : File size {} doesn't match header's information {}".format(len(data), header + 4))
             
-            buffer = bytearray(4096)
-            bufferPos = int("0xFEE", 0)
+        buffer = bytearray(4096)
+        bufferPos = int("0xFEE", 0)
 
-            # Format : https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Storer%E2%80%93Szymanski
-            # Each block of data consists of 1 Control Byte and 8 pieces of data (of variable lengths)
-            while (controlByte := f.read(1)):
-                controlBits = bin(int.from_bytes(controlByte, byteorder="little"))[2:].zfill(8)
-                for bit in reversed(controlBits): # Bits are read LSB-first
-                    if bit == "1": # Literal data
-                        buffer[bufferPos] = int.from_bytes(f.read(1), byteorder="little")
-                        self.uncompressedData.append(buffer[bufferPos])
+        # Format : https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Storer%E2%80%93Szymanski
+        # Each block of data consists of 1 Control Byte and 8 pieces of data (of variable lengths)
+        while file_offset < len(data):
+            controlByte = data[file_offset]
+            file_offset += 1
+            controlBits = bin(int.from_bytes(controlByte, byteorder="little"))[2:].zfill(8)
+            for bit in reversed(controlBits): # Bits are read LSB-first
+                if bit == "1": # Literal data
+                    buffer[bufferPos] = int.from_bytes(data[file_offset], byteorder="little")
+                    file_offset += 1
+                    self.uncompressedData.append(buffer[bufferPos])
+                    bufferPos += 1
+                    bufferPos &= (len(buffer) - 1) # If we reach the last index, we start at 0
+                else: # Reference
+                    ref = data[file_offset:file_offset + 2]
+                    if len(ref) == 0: # We reached the end of the file
+                        break
+                    elif len(ref) == 1: # Specific case of a 1 Byte reference -> OOOOLLLL
+                        offset = (ref[0] & 0b11110000) >> 4
+                        length = (ref[0] & 0b00001111) + 3
+                    else: # 2 Bytes reference -> OOOOOOOO OOOOLLLL
+                        offset = ((ref[1] & 0b11110000) << 4) | ref[0]
+                        length = (ref[1] & 0b00001111) + 3
+                    for i in range(length):
+                        byte = buffer[(offset + i) & (len(buffer) - 1)]
+                        buffer[bufferPos] = byte
+                        self.uncompressedData.append(byte)
                         bufferPos += 1
-                        bufferPos &= (len(buffer) - 1) # If we reach the last index, we start at 0
-                    else: # Reference
-                        ref = f.read(2)
-                        if len(ref) == 0: # We reached the end of the file
-                            break
-                        elif len(ref) == 1: # Specific case of a 1 Byte reference -> OOOOLLLL
-                            offset = (ref[0] & 0b11110000) >> 4
-                            length = (ref[0] & 0b00001111) + 3
-                        else: # 2 Bytes reference -> OOOOOOOO OOOOLLLL
-                            offset = ((ref[1] & 0b11110000) << 4) | ref[0]
-                            length = (ref[1] & 0b00001111) + 3
-                        for i in range(length):
-                            byte = buffer[(offset + i) & (len(buffer) - 1)]
-                            buffer[bufferPos] = byte
-                            self.uncompressedData.append(byte)
-                            bufferPos += 1
-                            bufferPos &= (len(buffer) - 1)
+                        bufferPos &= (len(buffer) - 1)
     
-    @property
-    def filepath(self):
-        return self.__filepath
-
-    @filepath.setter
-    def filepath(self, filepath):
-        self.__filepath = filepath
+    @classmethod
+    def fromFile(cls, filepath):
+        with open(filepath, "rb") as f:
+            return cls(f.read())
 
     @property
     def uncompressedData(self):
@@ -535,6 +540,11 @@ class FieldModule:
 
         # Only Section 3 is of interest here but using generic code in case of reuse later
         self.sections[3] = self.ModelLoader(self.sections[3])
+
+    @classmethod
+    def fromFile(cls, filepath):
+        with open(filepath, "rb") as f:
+            return cls(f.read())
 
     @property
     def sections(self):
