@@ -1,3 +1,5 @@
+# Blender addon definition
+
 bl_info = {
     "name": "Final Fantasy 7 LGP format",
     "author": "Sébastien Dougnac",
@@ -9,417 +11,513 @@ bl_info = {
     "category": "Import-Export"
 }
 
+# Imports
+
 import bpy
 import math
 import os
+import struct
 from mathutils import Matrix, Quaternion
 
-# The following table is taken from Mirex's work
-# Please go check his website, it's a real goldmine : https://mirex.mypage.sk/index.php?selected=0
+# Constants
+
+# The following dictionary is taken from Kujata
+# https://github.com/picklejar76/kujata/blob/master/friendly-names-db/skeleton-friendly-names.json
 
 SKELETONS_NAMES = {
-    "diff":"Aeris - 10 Years Old",
-    "cqga":"Aeris - 5 Years Old",
-    "azbb":"Aeris - Dress",
-    "cahc":"Aeris - Flowers",
-    "auff":"Aeris - Normal",
-    "akee":"Airship Crew - Fat",
-    "ajif":"Airship Crew - Normal",
-    "dhge":"Barrel - Normal",
-    "acgd":"Barret - Normal",
-    "aiba":"Barret - Parachute",
-    "ayfb":"Barret - Sailor",
-    "fqcb":"Barret - Young",
-    "gjcf":"Basket Ball - Normal",
-    "gdic":"Bat - Normal",
-    "fmcc":"Beach Boy - Normal",
-    "fmib":"Beach Girl - Normal",
-    "ckfc":"Beach Man 1 - Normal",
-    "clbb":"Beach Man 2 - Normal",
-    "flge":"Beach Woman 1 - Normal",
-    "ggid":"Beam of Light - Pink",
-    "ggjc":"Beam of Light - Yellow",
-    "cfbb":"Begger - Normal",
-    "fobe":"Begger 2 - Normal",
-    "bwfd":"Biggs - Normal",
-    "gjeb":"Bike - Arcade",
-    "brgd":"Bike - Normal",
-    "echd":"Blink - Normal",
-    "dvbe":"Bouncer - Left",
-    "dufa":"Bouncer - Right",
-    "fqab":"Box 1 - Left",
-    "fqbb":"Box 1 - South",
-    "hvcf":"Box 2 - Normal",
-    "etfe":"Boy - Blank Face",
-    "dgcd":"Boy 1 - Normal",
-    "cgif":"Boy 2 - Normal",
-    "ctib":"Boy 3 - Normal",
-    "afec":"Bugenhagen - Normal",
-    "gwcc":"Bugenhagen 2 - Normal",
-    "hgia":"Cage - Normal",
-    "aebc":"Caitsith - Normal",
-    "fbge":"Caitsith - Reporter",
-    "cyif":"Camera Man - Normal",
-    "eyie":"Car - Normal",
-    "bdga":"Cat - Normal",
-    "ezcc":"Cat 2 - Normal",
-    "gcjc":"Chair Lift - Normal",
-    "avhe":"Chest 1 - Normal",
-    "awae":"Chest 2 - Normal",
-    "bydd":"Chest 3 - Normal",
-    "hjga":"Chest 4 - Normal",
-    "hrce":"Chest 5 - Normal",
-    "cgda":"Child - Normal",
-    "aqgc":"Chocobo - Normal",
-    "ebec":"Chocobo Boy - Normal",
-    "gbia":"Chocobo Costume - Normal",
-    "gofd":"Chocobo Girl - Normal",
-    "gpcd":"Chocobo Racer 1 - Normal",
-    "gpjb":"Chocobo Racer 2 - Normal",
-    "gqfe":"Chocobo Racer 3 - Normal",
-    "abda":"Cid - Normal",
-    "aihb":"Cid - Parachute",
-    "gzad":"Cid - Young",
-    "ehhc":"Cloaked Figure - Normal",
-    "enab":"Cloud - 13 Years Old",
-    "buge":"Cloud - 8 Years Old",
-    "brib":"Cloud - Bike",
-    "aaaa":"Cloud - Normal",
-    "afie":"Cloud - Parachute",
-    "ekbf":"Cloud - Soldier",
-    "eihd":"Cloud - Soldier Helmet",
-    "bhff":"Cloud - Sword",
-    "htje":"Cloud - Wheel Chair",
-    "dlfb":"Cloud - Woman",
-    "bjfb":"Cloud's Mother - Normal",
-    "gchc":"Coaster Car - Normal",
-    "eoce":"Coffin - Normal",
-    "exga":"Condor - Normal",
-    "ewbd":"Condor Fort Man - Normal",
-    "ewje":"Condor Fort Woman - Normal",
-    "grga":"Cosmo Canyon - Man",
-    "guba":"Costa Del Sol - Boy",
-    "guhc":"Costa Del Sol - Door 1",
-    "guib":"Costa Del Sol - Door 2",
-    "gsbe":"Costa Del Sol - Girl",
-    "gtfc":"Costa Del Sol - Old Woman",
-    "gvae":"Costa Del Sol - Satellite Dish",
-    "gvbc":"Costa Del Sol - Wind Veil",
-    "gsje":"Costa Del Sol - Woman",
-    "hree":"Crystal - Rock",
-    "hrff":"Crystal 1 - Normal",
-    "hrha":"Crystal 2 - Normal",
-    "hrhe":"Crystal 3 - Normal",
-    "gghe":"Cursor - Normal",
-    "badd":"Dancer - Normal",
-    "cige":"Detective - Normal",
-    "gajc":"Dio - Normal",
-    "hjie":"Dirt Line - A",
-    "hjjd":"Dirt Line - B",
-    "hkac":"Dirt Line - C",
-    "bljc":"Doctor - Normal",
-    "deie":"Dog 1 - Normal",
-    "beec":"Dog 2 - Normal",
-    "bdcd":"Dolphin - Normal",
-    "fjbd":"Dome - Normal",
-    "dvhf":"Don Corneo - Normal",
-    "elgc":"Dr Gast - Normal",
-    "fzcc":"Dragon - Normal",
-    "bngd":"Dyne - Normal",
-    "fqjb":"Dyne - Young",
-    "grcc":"Elevator - Normal",
-    "cogb":"Elmyra - Normal",
-    "awcb":"Employee 1 - Normal",
-    "dzgf":"Employee 2 - Normal",
-    "cdja":"Employee 3 - Normal",
-    "hkea":"Face - Normal",
-    "ftic":"Farmer 1 - Normal",
-    "ftcf":"Farmer 2 - Normal",
-    "dmia":"Fat Man 1 - Normal",
-    "dsbc":"Fat Woman 1 - Normal",
-    "bfca":"Fatman - Normal",
-    "gjha":"Fighter 1 - Normal",
-    "gkcf":"Fighter 2 - Normal",
-    "gkid":"Fighter 3 - Normal",
-    "gleb":"Fighter 4 - Normal",
-    "hyfd":"Final Jenova - Normal",
-    "ffec":"Fish 1 - Normal",
-    "fgae":"Fish 2 - Normal",
-    "ffha":"Fish 3 - Normal",
-    "hrae":"Flag - Red",
-    "czgf":"Flower - Normal",
-    "gehd":"Frankenstein - Normal",
-    "ggef":"Gate 2 - Left",
-    "ggfe":"Gate 2 - Right",
-    "euaf":"Girl - Blank Face",
-    "bmee":"Girl - Normal",
-    "fkdf":"Girl - Normal",
-    "cpca":"Girl 2 - Normal",
-    "ched":"Girl 3 - Normal",
-    "hgjd":"Godo - Normal",
-    "ctcc":"Golden Saucer Staff - Female",
-    "gcbd":"Golden Saucer Staff - Male",
-    "bsfc":"Grandma - Normal",
-    "dsgf":"Grandma 1 - Normal",
-    "coad":"Grandma 2 - Normal",
-    "hmif":"Grasshopper - Normal",
-    "effb":"Grate - Normal",
-    "azhe":"Guard - Normal",
-    "fxjc":"Guard - Normal",
-    "asjc":"Guide 1 - Normal",
-    "bccf":"Guide 2 - Normal",
-    "auda":"Gun - Normal",
-    "eefb":"Gym Arm - Normal",
-    "ebjf":"Hall Panel - Left",
-    "ecae":"Hall Panel - Right",
-    "gfdf":"Hang Man - Normal",
-    "gebb":"Haunted House Butler - Normal",
-    "algd":"Heidigger - Normal",
-    "eaid":"Helicopter - Normal",
-    "anbd":"Hojo - Normal",
-    "ekjb":"Hojo - Young",
-    "gujc":"Ice Map - Normal",
-    "hseb":"Icecle - Normal",
-    "cpjf":"Ifalna - Normal",
-    "fkca":"Jenova's Arm - Normal",
-    "axdc":"Jessie - Normal",
-    "eoac":"Key - Normal",
-    "dyfd":"King - Normal",
-    "dzbb":"Knight - Normal",
-    "dhhf":"Ladder - Normal",
-    "fghf":"Lantern - Normal",
-    "ddha":"Lonely Man - Normal",
-    "atfe":"Lucrecia - Normal",
-    "drif":"Lunch 1 - Normal",
-    "dria":"Lunch 2 - Normal",
-    "drje":"Lunch 3 - Normal",
-    "ccbc":"Man - Normal",
-    "hlfc":"Man - Normal",
-    "blde":"Man 1 - Normal",
-    "asbf":"Man 10 - Normal",
-    "fnef":"Man 11 - Normal",
-    "crid":"Man 12 - Normal",
-    "cefd":"Man 13 - Normal",
-    "ciac":"Man 14 - Normal",
-    "emdf":"Man 15 - Normal",
-    "csed":"Man 16 - Normal",
-    "dpef":"Man 17 - Normal",
-    "crca":"Man 2 - Normal",
-    "fsge":"Man 2 - Normal",
-    "gwif":"Man 2 - Normal",
-    "deda":"Man 3 - Normal",
-    "gxef":"Man 3 - Normal",
-    "cjif":"Man 4 - Normal",
-    "dcic":"Man 5 - Normal",
-    "drcc":"Man 6 - Normal",
-    "bqfb":"Man 7 - Normal",
-    "dqgd":"Man 8 - Normal",
-    "cjcc":"Man 9 - Normal",
-    "cmif":"Man1 - Normal",
-    "fjaf":"Marker - Normal",
-    "cyae":"Marlene - Normal",
-    "hjgc":"Materia - Black",
-    "dabf":"Materia - Green",
-    "gwib":"Materia - Holy",
-    "aude":"Materia - Pink",
-    "awbe":"Materia - Red",
-    "byib":"Materia - Teal",
-    "ateb":"Materia - Yellow",
-    "frgd":"Mayor - Normal",
-    "ghgf":"Mech - Normal",
-    "gzhf":"Mechanic - Normal",
-    "dfgd":"Merchant - Normal",
-    "fgec":"Metal Door - Normal",
-    "djfa":"Metal Hook - Normal",
-    "djfe":"Metal Plank - Normal",
-    "dkjd":"Midgar Door - Left",
-    "dkie":"Midgar Door - Right",
-    "fhaa":"Monster 1 - Normal",
-    "fiba":"Monster 2 - Normal",
-    "gmha":"Moogle - Adult Pink",
-    "gljd":"Moogle - Adult Whitel",
-    "goac":"Moogle - Young Pink",
-    "gnca":"Moogle - Young White",
-    "gngb":"Moogle - Young Yellow",
-    "fved":"Mr Coates - Normal",
-    "fwgf":"Necklace - Normal",
-    "epfb":"Nibeilheim Monster - Normal",
-    "bybf":"North Mako Reactor Gate 1 - Normal",
-    "bycd":"North Mako Reactor Gate 2 - Normal",
-    "byba":"North Mako Reactor Gate 3 - Normal",
-    "btec":"Nurse - Normal",
-    "bocc":"Old Farmer - Normal",
-    "euhb":"Old Man - Normal",
-    "bfhe":"Old Man 1 - Normal",
-    "dmcb":"Old Man 2 - Normal",
-    "arfd":"Old Man 3 - Normal",
-    "edjd":"Old Man 4 - Normal",
-    "dxje":"Old Woman 2 - Normal",
-    "eegc":"Palmer - Normal",
-    "bygf":"Potion - Blue",
-    "dcfb":"Potion - Green",
-    "ccha":"Potion - Normal",
-    "fabb":"Potion - Red",
-    "faae":"Potion 1 - Normal",
-    "fabe":"Potion 2 - Normal",
-    "fsdd":"Potion 3 - Normal",
-    "fadc":"Potion 4 - Normal",
-    "awhf":"President Shinra - Normal",
-    "bkbf":"Priscilla - Normal",
-    "eaga":"Propeller - Normal",
-    "facc":"Propeller 2 - Normal",
-    "gshc":"Propeller 3 - Normal",
-    "hxbc":"Proud Clod - Normal",
-    "cfha":"Punk - Normal",
-    "cufc":"Punk 1 - Normal",
-    "cvba":"Punk 2 - Normal",
-    "fufe":"Punk 3 - Normal",
-    "cvge":"Punk 4 - Normal",
-    "adda":"Red XIII - Normal",
-    "fjcf":"Red XIII - Soldier",
-    "fbba":"Reporter 1 - Normal",
-    "fcgd":"Reporter 2 - Normal",
-    "fcaf":"Reporter 3 - Normal",
-    "fgfb":"Robot Arm - Normal",
-    "bzda":"Robot Soldier - Normal",
-    "gzgb":"Rocket Inside Door - Left",
-    "gzha":"Rocket Inside Door - Right",
-    "dtce":"Rocket Man - Normal",
-    "gydc":"Rocket Town - Woman",
-    "hjhf":"Rolling Rock - Normal",
-    "eagf":"Rope - Broken",
-    "dcce":"Rope - Normal",
-    "alad":"Rufus - Normal",
-    "cned":"Sack - Normal",
-    "avfe":"Save Icon - Normal",
-    "amcc":"Scarlet - Normal",
-    "eoea":"Sephiroth - Book",
-    "bkhd":"Sephiroth - Normal",
-    "bbab":"Sephiroth - Sword",
-    "bgjc":"Sephiroth - Sword 2",
-    "bgdc":"Shera - Normal",
-    "bcgd":"Ship Crew - Normal",
-    "hqgc":"Sled - Normal",
-    "hpce":"Snow - Child",
-    "hpib":"Snow - Man",
-    "bohe":"Snow - Woman",
-    "hqhc":"Snow Board - Normal",
-    "fndf":"Soccer Ball - Normal",
-    "dxbd":"Soldier - Gun",
-    "bwab":"Soldier - Normal",
-    "eseb":"Soldier - Sword",
-    "cade":"South Mako Reactor Gate - Normal",
-    "hkbb":"Spirit Pool - Normal",
-    "ebca":"Spot Light - Normal",
-    "dtjb":"Suit Man - Normal",
-    "giha":"Sumo 1 - Top Half",
-    "gjab":"Sumo 2 - Top Half",
-    "hkhb":"Temple Model - Normal",
-    "bidb":"Tifa - 15 Years Old",
-    "buac":"Tifa - 7 Years Old",
-    "axja":"Tifa - Dress",
-    "aagb":"Tifa - Normal",
-    "aggb":"Tifa - Parachute",
-    "eqib":"Tifa - Sword",
-    "bvda":"Tifa's Father - Normal",
-    "doga":"Tifa's Hand - Normal",
-    "hneb":"Tonge - Normal",
-    "evfe":"Turks - Elena - Normal",
-    "bpjb":"Turks - Reeve - Normal",
-    "aodd":"Turks - Reno - Normal",
-    "mmmo":"Turks - Reno Redface",
-    "anic":"Turks - Rude - Normal",
-    "dbec":"Turks - Tseng - Normal",
-    "hsjd":"Ultima Weapon - Normal",
-    "aehd":"Vincent - Normal",
-    "bijd":"Vincent - Turk",
-    "hkjc":"Wall Demon - Normal",
-    "bxbe":"Wedge - Normal",
-    "gabe":"Wizard - Normal",
-    "cbfe":"Woman - Normal",
-    "eiac":"Woman - Normal",
-    "flac":"Woman - Normal",
-    "hmbe":"Woman - Normal",
-    "braf":"Woman 1 - Normal",
-    "bbge":"Woman 2 - Normal",
-    "cwed":"Woman 3 - Normal",
-    "ghad":"Woman 4 - Normal",
-    "ehbe":"Woman 5 - Normal",
-    "doib":"Woman 6 - Normal",
-    "ecbf":"Woman 7 - Normal",
-    "fpcb":"Woman 8 - Normal",
-    "dqae":"Woman 9 - Normal",
-    "ecib":"Woman1 - Normal",
-    "dafb":"Woman2 - Normal",
-    "dnje":"Wrestler 1 - Normal",
-    "bpdc":"Wrestler 2 - Normal",
-    "dndf":"Wrestler 3 - Normal",
-    "hgaf":"Wutai - Child",
-    "hhge":"Wutai - Door Left",
-    "hhhd":"Wutai - Door Right",
-    "hdgf":"Wutai - Man 1",
-    "hffb":"Wutai - Man 2",
-    "hddb":"Wutai - Man 3",
-    "hhic":"Wutai - Rolling Door",
-    "hhjf":"Wutai - Shinobi",
-    "hecd":"Wutai - Woman 1",
-    "heib":"Wutai - Woman 2",
-    "abjb":"Yuffie - Normal",
-    "ahdf":"Yuffie - Parachute",
-    "feea":"Yuffie - Reporter",
-    "ibad":"Zack - Normal",
-    "ejdc":"Zack - Sword Sheathed",
-    "ibgd":"Zack - Sword Wielded",
-    "bnaf":"Zangan - Normal"
+    "aaaa": "Cloud",
+    "aagb": "Tifa",
+    "abda": "Cid",
+    "abjb": "Yuffie",
+    "acgd": "Barret",
+    "adda": "Red XIII",
+    "aebc": "Cait Sith",
+    "aehd": "Vincent",
+    "afec": "Bugenhagen",
+    "afie": "Cloud Parachute",
+    "aggb": "Tifa Parachute",
+    "ahdf": "Yuffie Parachute",
+    "aiba": "Barret Parachute",
+    "aihb": "Cid Parachute",
+    "ajif": "Skinny Highwind Crewman",
+    "akee": "Burly Highwind Crewman",
+    "alad": "Rufus",
+    "algd": "Heidegger",
+    "amcc": "Scarlet",
+    "anbd": "Hojo",
+    "anic": "Rude",
+    "aodd": "Reno",
+    "aqgc": "Chocobo",
+    "arfd": "Sleeping Old Man",
+    "asbf": "Tanned Midgar Man",
+    "asjc": "Chocobo Sage",
+    "ateb": "Command Materia",
+    "atfe": "Lucretia in Cave",
+    "auda": "Handgun",
+    "aude": "Independent Materia",
+    "auff": "Aeris",
+    "avfe": "Save Point",
+    "avhe": "Traditional Chest",
+    "awae": "Green Chest",
+    "awbe": "Summon Materia",
+    "awcb": "Hojo Assistant",
+    "awhf": "President Shinra",
+    "axdc": "Jessie",
+    "axja": "Tifa Corneo",
+    "ayfb": "Barret Sailor",
+    "azbb": "Aeris Corneo",
+    "azhe": "Train Guard",
+    "badd": "Honey Bee Girl",
+    "bbab": "Sephiroth w/Sword",
+    "bbge": "Costa Bar Girl",
+    "bccf": "Ancient Temple Guard",
+    "bcgd": "Shinra Sailor",
+    "bdcd": "Mr. Dolphin",
+    "bdga": "Cat",
+    "beec": "Mideel Dog (Grey)",
+    "bfca": "Johnny's Dad",
+    "bfhe": "Sector 7 Shop Owner",
+    "bgdc": "Shera",
+    "bgjc": "Sephiroth w/Jenny Head",
+    "bhff": "Cloud w/Buster Sword",
+    "bidb": "Tifa Cowgirl",
+    "bijd": "Vincent Turk",
+    "bjfb": "Cloud's Mom",
+    "bkbf": "Priscilla",
+    "bkhd": "Sephiroth",
+    "blde": "Tifa's Father's Friend",
+    "bljc": "Mideel Doctor",
+    "bmee": "Little Girl",
+    "bnaf": "ZANGAN",
+    "bngd": "Dyne w/Gun",
+    "bocc": "Grey Peasant",
+    "bohe": "Icicle Inn Woman/Mother",
+    "bpdc": "Muscle-Man (Blonde)",
+    "bpjd": "Reeve",
+    "bqfb": "Blue Villager",
+    "braf": "Cloud's House Occupant",
+    "brgd": "Motorcycle...",
+    "brib": "Cloud Motorcycle (Jesus)",
+    "bsfc": "Female Villager",
+    "btec": "Female Nurse",
+    "buac": "Young Tifa",
+    "buge": "Young Cloud",
+    "bvda": "Tifa's Father",
+    "bwab": "Shinra Soldier",
+    "bwfd": "Biggs",
+    "bxbe": "Wedge",
+    "bxjb": "Train Door",
+    "byba": "Slab",
+    "bybf": "Panel w/Lights",
+    "bycd": "Catwalk Grating",
+    "bydd": "Gold Chest",
+    "bygf": "Blue Potion",
+    "byib": "Magic Materia",
+    "bzda": "AIR BUSTER!",
+    "bzhf": "Shinra Beta Copter",
+    "cade": "Catwalk Grating",
+    "cahc": "Aeris w/Flower Basket",
+    "cbfe": "Red hair hooker",
+    "ccbc": "Red Punk",
+    "ccha": "Light Blue Potion",
+    "cdja": "Shinra Manager",
+    "cefd": "Train Drunk",
+    "cfbb": "Phoenix Down Hobo",
+    "cfha": "Honey Bee Guard/Punk",
+    "cgda": "Sector 7 Kid",
+    "cgif": "Red Cap Tifa friend",
+    "ched": "Chole",
+    "ciac": "Hi-Potion Dealer",
+    "cige": "Biggs Train Disguise",
+    "cjcc": "Wedge Train Disguise",
+    "cjif": "Johnny",
+    "ckfc": "Costa Guy",
+    "clbb": "Costa Surf Bro",
+    "clgd": "Tall Cloud Field",
+    "cmde": "Tall Jessie Field",
+    "cmif": "Tanned Guy",
+    "cned": "Item Bag",
+    "cnfb": "Moving Train (Train Graveyard)",
+    "cnhf": "Train Carriage (Train Graveyard)",
+    "coad": "Housewife Purple",
+    "cogb": "Elmyra",
+    "cpca": "Child, Red dungarees",
+    "cpjf": "Ifalna",
+    "cqga": "Kid Aeris",
+    "crca": "Tifa's Father's Friend",
+    "crid": "Tracksuit Man",
+    "csed": "Cosmo Miner Repairman csga",
+    "ctbe": "Magic Materia",
+    "ctcc": "Gold Saucer F. Attendant",
+    "ctib": "Hall; Kid Opponent",
+    "cufc": "Hall; Black Flexer",
+    "cvba": "Hall; Burly Flexer",
+    "cvge": "Hall; Punk Flexer",
+    "cwed": "Sector 7 Busy-body",
+    "cyae": "Marlene",
+    "cyif": "Mr. Duffi-look alike",
+    "czed": "Avalanche Hideout: Pinball Machine",
+    "czgb": "Yellow Rectangle",
+    "czgf": "Flowers",
+    "dabf": "Green Materia",
+    "dafb": "Cologne Lady",
+    "dbec": "Tseng",
+    "dcce": "Pillar Collapse Hook-Swing",
+    "dcfb": "Bright Green Potion",
+    "dcic": "Tanned Guy NPC",
+    "ddha": "This guy are sick",
+    "deda": "Clothes Shop Son",
+    "deie": "Dog (Brown)",
+    "dfgd": "Tiara Guy",
+    "dgcd": "Nibel Kids Boy",
+    "dhaf": "Reno (No Face)",
+    "dhge": "Barrel",
+    "dhhf": "Ladder",
+    "dhid": "Rocky Caltrops",
+    "diff": "Kid Aeris, Brown Dress",
+    "djfa": "Claw in Golden Saucer Claw-Game",
+    "djfe": "Girder",
+    "djid": "Chocobo Carriage",
+    "dkie": "Metal Flooring (4)",
+    "dkjd": "Metal Flooring (7)",
+    "dlfb": "Cloud Corneo",
+    "dmcb": "Old tanned guy",
+    "dmia": "Miner/Jon-Tron",
+    "dndf": "Black Muscle-man",
+    "dnje": "Mukki",
+    "doga": "Battle Model-Like Hand",
+    "doib": "Female Trenchcoat NPC doje",
+    "dpef": "Chef in Wall Market",
+    "dqae": "Accessory Maid",
+    "dqgd": "Diner at Wall Market",
+    "drcc": "Rocket Technician",
+    "dria": "Meal A TEX Wall Market",
+    "drif": "Meal B TEX Wall Market",
+    "drje": "Meal C TEX Wall Market",
+    "dsbc": "Kalm Chef",
+    "dsgf": "Junon Old Inn Lady",
+    "dtce": "High-Collar NPC",
+    "dtic": "Propellor (Green)",
+    "dtjb": "Honey Bee Manager",
+    "dufa": "Scotch",
+    "dvbe": "Kotch",
+    "dvhf": "Don Corneo",
+    "dxbd": "Shinra Soldier Rifle",
+    "dxje": "Daughter Honey Bee Room",
+    "dyfd": "King Shinra",
+    "dzbb": "Knight",
+    "dzgf": "Shinra Manager Alt",
+    "eaga": "Broken Propellor, Climb to Shinra Tower",
+    "eagf": "Swinging Beam, Climb to Shinra Tower",
+    "eaid": "Shinra Alpha Copter",
+    "ebca": "Beam of light",
+    "ebec": "Choco Billy",
+    "ebjf": "Door/Panel Shinra Tower?",
+    "ecae": "Ditto",
+    "ecbf": "Turqouise Dress NPC",
+    "echd": "Shinra Tower Glass Elevator",
+    "ecib": "Shinra Secretary",
+    "edea": "Woman fl60",
+    "edjd": "Old Man",
+    "eefb": "Construct, maybe a paddock",
+    "eegc": "Palmer",
+    "effb": "Grate Toilet 66th Floor",
+    "eghe": "Masamune (President Shinra Dead)",
+    "ehbe": "Tracksuit NPC",
+    "ehhc": "Black-Cloaked Man",
+    "eiac": "Red Woman NPC",
+    "eihd": "Cloud, Helmet in Hands, on Truck",
+    "ejdc": "Zack w/sword",
+    "ekbf": "MP Cloud",
+    "ekjb": "Young Hojo",
+    "elgc": "Young Gast",
+    "emdf": "Corel Miner",
+    "enab": "Young Cloud Black Shirt",
+    "eoac": "Key",
+    "eoce": "Vincent Coffin lid",
+    "eoea": "Sephiroth with book",
+    "epfb": "Materia Keeper",
+    "eqib": "Cowgirl Tifa w/Masamune",
+    "erha": "Sephy w/Jenny Head",
+    "eseb": "MP Cloud w/Sword",
+    "etfe": "Blue Child, No Face",
+    "euaf": "Red Child, No Face",
+    "euhb": "Crazy old guy!",
+    "evfe": "Elena",
+    "ewbd": "Corel Burly Miner",
+    "ewje": "Corel Miner Wife",
+    "exga": "Small Condor",
+    "eyie": "Rufus' Car",
+    "ezcc": "Patchwork Cat",
+    "faae": "Cyan Potion",
+    "fabb": "Red Potion",
+    "fabe": "Green Potion",
+    "facc": "Black Propellor/Untex",
+    "fadc": "Yellow Potion",
+    "fbba": "Journalist Male",
+    "fbge": "Cait Sith Journalist",
+    "fcaf": "Journalist Female",
+    "fcgd": "Cameraman",
+    "feea": "Yuffie Journalist",
+    "ffec": "Small Green Fish",
+    "ffha": "Yellow/Red Shoal",
+    "fgae": "Shark",
+    "fgec": "Metal Door",
+    "fgfb": "Crane Claw",
+    "fghf": "Huge Materia Capsule Underwater Reactor",
+    "fhaa": "Carry Armour",
+    "fhic": "Door/Panel",
+    "fhjb": "Door/Panel 1",
+    "fiba": "Bottomswell",
+    "fjaf": "Red Light",
+    "fjbd": "Lung Meter CPR",
+    "fjcf": "Red XIII Soldier Disguise",
+    "fkca": "Jenova Tentacle",
+    "fkdf": "Hojo Groupie lying down",
+    "flac": "Costa Entrance Girl",
+    "flge": "Costa Beach girl",
+    "fmcc": "Snorkel Kid",
+    "fmib": "Swimsuit kid",
+    "fndf": "Football",
+    "fnef": "Sector 7 Wep Shop Shooter",
+    "fobe": "Layabout",
+    "fpcb": "Catastrophe Corel girl",
+    "fqab": "Long Train, Corel Chase",
+    "fqbb": "Cid's Train, Corel Chase",
+    "fqcb": "Barret, Corel Flashback",
+    "fqjb": "Dyne, Corel Flashback frae",
+    "frgd": "Corel Mayor",
+    "fsdd": "Pink Potion",
+    "fsge": "Corel Miner, slumped",
+    "ftcf": "Corel Miner",
+    "ftic": "Corel Miner, female",
+    "fufe": "Corel Miner/Punk",
+    "fved": "Mr. Coates",
+    "fwae": "Ester",
+    "fwgf": "Dyne's Pendant",
+    "fxjc": "Gold Saucer Guard",
+    "fzcc": "EDK",
+    "gabe": "Play Wizard",
+    "gajc": "Dio",
+    "gbia": "G.Saucer Bird-Suit",
+    "gcbd": "Male Attendant",
+    "gchc": "G.Saucer Coaster",
+    "gcjc": "Gondola Texture",
+    "gdic": "Bat",
+    "gebb": "Hotel Greeter/Lurch",
+    "gehd": "Hotel Desk/Igor",
+    "gfdf": "Mr. Hangman",
+    "ggef": "Elixir Cabinet Door-right",
+    "ggfe": "Ditto, Left door",
+    "gghe": "Hand Pointer Tex",
+    "ggid": "Purple shaft of light",
+    "ggjc": "Yellow shaft of light (Battle Square)",
+    "ghad": "Battle Square, f.kicker",
+    "ghgf": "G.Saucer Capture Device",
+    "giha": "ZANGIEF!",
+    "gjab": "E.HONDA!",
+    "gjcf": "Basketball",
+    "gjeb": "Speed Bike, Field",
+    "gjha": "3D Battler, Rookie",
+    "gkcf": "3D Battler, Luchadore gkec",
+    "gkid": "3D Battler, Afro Thunder",
+    "gleb": "3D Battler, Super Hero",
+    "gljd": "Mog",
+    "gmha": "Pink Mog",
+    "gnca": "Bright Mog",
+    "gngb": "Yellow Mog",
+    "goac": "Pink Mog",
+    "gofd": "Choco Square Teller",
+    "gpcd": "Joe",
+    "gpjb": "Blue Jockey",
+    "gqfe": "Green Jockey",
+    "grcc": "Choco Elevator (From Corel Prison)",
+    "grga": "Cosmo Canyon Greeter",
+    "gsbe": "Cosmo Kid",
+    "gshc": "Cosmo Propellor",
+    "gsje": "Cosmo Mother",
+    "gtfc": "Cosmo Elderly Lady",
+    "guba": "Cosmo Kid Boy",
+    "guhc": "Cosmo Door",
+    "guib": "Cosmo Door",
+    "gujc": "Glacier Map",
+    "gvae": "Radar Dish",
+    "gvbc": "Weather Vane",
+    "gvce": "Yellow Huge Materia",
+    "gvdc": "Green Huge Materia",
+    "gvea": "Red Huge Materia",
+    "gvee": "Blue Huge Materia",
+    "gwaa": "Cosmo Observatory Planet/Two Moons",
+    "gwcc": "Bugenhagen Lying down (Green orb missing)",
+    "gwib": "Green orb",
+    "gwif": "Rocket Town Citizen",
+    "gxef": "Rocket Town Bored Citizen gxgc",
+    "gydc": "Rocket Town Citizen",
+    "gzad": "Young Cid",
+    "gzgb": "Door Base; Rocket",
+    "gzha": "Door Base; Rocket",
+    "gzhf": "Rocket Technician",
+    "hagb": "Rocket Huge Materia Capsule",
+    "hcef": "Debris, pins Cid",
+    "hdbb": "Wutai Citizen male",
+    "hdgf": "Wutai Citizen, Staniv hdic",
+    "hecd": "Wutai Citizen, Chekhov",
+    "heib": "Wutai Citizen female",
+    "hffb": "Wutai Citizen, Gorki",
+    "hgaf": "Wutai Citizen, Shake",
+    "hgia": "Yuffie House Cage",
+    "hgjd": "Godo",
+    "hhge": "Wutai Door",
+    "hhhd": "Wutai Door",
+    "hhic": "Wutai Panel",
+    "hhjf": "Corneo Ninja",
+    "hjdc": "Component, Gong-mechanism possibly",
+    "hjga": "Ancient Temple Chest",
+    "hjhf": "Rolling Stone",
+    "hjie": "Clock, Minute/Sec Hand",
+    "hjjd": "Clock, Minute/sec Hand",
+    "hkac": "Clock, Hour Hand",
+    "hkbb": "Clock core, base",
+    "hkea": "Clock Core, mouth",
+    "hkhb": "Temple Puzzle",
+    "hkjc": "Demon Wall",
+    "hlfc": "Green Digger",
+    "hmbe": "Purple Digger",
+    "hmif": "Ancient Forest, Fly",
+    "hnaf": "Ancient FOrest, Frog",
+    "hneb": "Ancient Forest, Tongue Feeler",
+    "hnif": "Ancient Forest, Bee Hive",
+    "hobd": "Ancient Key",
+    "hpce": "Icicle Kid Girl",
+    "hpib": "Icicle Man",
+    "hqgc": "Blue Panel",
+    "hqhc": "Snowboard",
+    "hrae": "Red Flag",
+    "hrce": "Blue Chest",
+    "hree": "Tumbling Rock",
+    "hrff": "Ice Stalagmite",
+    "hrha": "Ice Stalagmite",
+    "hrhe": "Ice Stalagmite",
+    "hseb": "Ice Stalagmite",
+    "hsjd": "Ultimate Weapon",
+    "htje": "Handicapable Cloud",
+    "hvcf": "Train Cars, Corel Chase",
+    "hvjf": "Red XIII Para Freefall",
+    "hwib": "Parachute open texture",
+    "hxbc": "Proud Clod",
+    "hyfd": "Jenova Synthesis",
+    "iajd": "Yellow Projectile (Diamond Wep Attacks)",
+    "ibad": "Zack, no sword",
+    "ibgd": "Zack, w/sword"
 }
 
-class HRCBone:
-    def __init__(self, name, parent, length, animations, textures):
-        self.name = name
-        self.parent = parent
-        self.length = length
-        self.animations = animations
-        self.textures = textures
-        
+# Classes
+
+class LGPFile:
+    def __init__(self, filepath):
+        self.toc = {}
+        with open(filepath, "rb") as f:
+            f.seek(12, 1) # Ignoring the first 12 bytes (File creator)
+            self.nb_files = int.from_bytes(f.read(4), byteorder="little")
+            if self.nb_files > 0: # If we have at least one file, we process the first one's information outside of the loop
+                filename = f.read(20).decode("utf-8").rstrip('\x00')
+                first_offset = int.from_bytes(f.read(4), byteorder="little")
+                self.toc[filename] = first_offset
+                f.seek(3, 1) # Avoiding useless information
+            for _ in range(self.nb_files - 1): # Now we process all remaining files
+                filename = f.read(20).decode("utf-8").rstrip('\x00')
+                file_offset = int.from_bytes(f.read(4), byteorder="little")
+                if file_offset < first_offset:
+                    first_offset = file_offset
+                self.toc[filename] = file_offset
+                f.seek(3, 1) # Avoiding useless information
+            self.toc = { k : v - first_offset for k, v in self.toc.items() } # Modify every offset to remove header and CRC length
+            f.seek(first_offset, 0) # Moving to the first file description
+            self.files = f.read() # Storing all files' data
+
     @property
-    def name(self):
-        return self.__name
-        
-    @name.setter
-    def name(self, name):
-        self.__name = name
-        
+    def toc(self):
+        return self.__toc
+
+    @toc.setter
+    def toc(self, toc):
+        self.__toc = toc
+
     @property
-    def parent(self):
-        return self.__parent
+    def files(self):
+        return self.__files
+
+    @files.setter
+    def files(self, files):
+        self.__files = files
+
+    def getFileContent(self, filename):
+        if filename not in self.toc:
+            raise KeyError("File name {} not in LGP file".format(filename))
         
-    @parent.setter
-    def parent(self, parent):
-        self.__parent = parent
+        start_len = self.toc[filename] + 20
+        start_pos = self.toc[filename] + 24
         
-    @property
-    def length(self):
-        return self.__length
+        length = int.from_bytes(self.files[start_len:start_pos], byteorder="little")
         
-    @length.setter
-    def length(self, length):
-        self.__length = length
-        
-    @property
-    def animations(self):
-        return self.__animations
-        
-    @animations.setter
-    def animations(self, animations):
-        self.__animations = animations
+        return self.files[start_pos:start_pos + length]
+
+class LZSSFile:
+    def __init__(self, filepath):
+        self.filepath = filepath
+        self.uncompressedData = bytearray()
+
+        with open(self.filepath, "rb") as f:
+            # Header is 4 bytes defining the file's length, not including itself
+            header = struct.unpack("<I", f.read(4))[0]
+            if os.path.getsize(self.filepath) - 4 != header:
+                raise ValueError("Not a valid LZSS file : File size {} doesn't match header's information {}".format(os.path.getsize(self.filepath), header + 4))
+            
+            buffer = bytearray(4096)
+            bufferPos = int("0xFEE", 0)
+
+            # Format : https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Storer%E2%80%93Szymanski
+            # Each block of data consists of 1 Control Byte and 8 pieces of data (of variable lengths)
+            while (controlByte := f.read(1)):
+                controlBits = bin(int.from_bytes(controlByte, byteorder="little"))[2:].zfill(8)
+                for bit in reversed(controlBits): # Bits are read LSB-first
+                    if bit == "1": # Literal data
+                        buffer[bufferPos] = int.from_bytes(f.read(1), byteorder="little")
+                        self.uncompressedData.append(buffer[bufferPos])
+                        bufferPos += 1
+                        bufferPos &= (len(buffer) - 1) # If we reach the last index, we start at 0
+                    else: # Reference
+                        ref = f.read(2)
+                        if len(ref) == 0: # We reached the end of the file
+                            break
+                        elif len(ref) == 1: # Specific case of a 1 Byte reference -> OOOOLLLL
+                            offset = (ref[0] & 0b11110000) >> 4
+                            length = (ref[0] & 0b00001111) + 3
+                        else: # 2 Bytes reference -> OOOOOOOO OOOOLLLL
+                            offset = ((ref[1] & 0b11110000) << 4) | ref[0]
+                            length = (ref[1] & 0b00001111) + 3
+                        for i in range(length):
+                            byte = buffer[(offset + i) & (len(buffer) - 1)]
+                            buffer[bufferPos] = byte
+                            self.uncompressedData.append(byte)
+                            bufferPos += 1
+                            bufferPos &= (len(buffer) - 1)
     
     @property
-    def textures(self):
-        return self.__textures
-        
-    @textures.setter
-    def textures(self, textures):
-        self.__textures = textures
+    def filepath(self):
+        return self.__filepath
+
+    @filepath.setter
+    def filepath(self, filepath):
+        self.__filepath = filepath
+
+    @property
+    def uncompressedData(self):
+        return self.__uncompressedData
+
+    @uncompressedData.setter
+    def uncompressedData(self, uncompressedData):
+        self.__uncompressedData = uncompressedData
 
 class HRCSkeleton:
     def __init__(self, filename, name, nb_bones):
@@ -427,6 +525,8 @@ class HRCSkeleton:
         self.name = name
         self.nb_bones = nb_bones
         self.bones = {}
+        self.p_file = None
+        self.tex_files = None
     
     @property
     def filename(self):
@@ -465,55 +565,56 @@ class HRCSkeleton:
         
     def addBone(self, bone):
         self.bones[bone.name] = bone
+
+class HRCBone:
+    def __init__(self, name, parent, length, p_file, tex_files):
+        self.name = name
+        self.parent = parent
+        self.length = length
+        self.p_file = p_file
+        self.tex_files = tex_files
         
-class LGPFile:
-    def __init__(self, filepath):
-        self.toc = {}
-        with open(filepath, "rb") as f:
-            f.seek(12, 1) # Ignoring the first 12 bytes (File creator)
-            self.nb_files = int.from_bytes(f.read(4), byteorder="little")
-            if self.nb_files > 0: # If we have at least one file, we process the first one's information outside of the loop
-                filename = f.read(20).decode("utf-8").rstrip('\x00')
-                first_offset = int.from_bytes(f.read(4), byteorder="little")
-                self.toc[filename] = first_offset
-                f.seek(3, 1) # Avoiding useless information
-            for toc_index in range(self.nb_files - 1): # Now we process all remaining files
-                filename = f.read(20).decode("utf-8").rstrip('\x00')
-                file_offset = int.from_bytes(f.read(4), byteorder="little")
-                if file_offset < first_offset:
-                    first_offset = file_offset
-                self.toc[filename] = file_offset
-                f.seek(3, 1) # Avoiding useless information
-            self.toc = { k : v - first_offset for k, v in self.toc.items() } # Modify every offset to remove header and CRC length
-            f.seek(first_offset, 0) # Moving to the first file description
-            self.files = f.read() # Storing all files' data
+    @property
+    def name(self):
+        return self.__name
+        
+    @name.setter
+    def name(self, name):
+        self.__name = name
+        
+    @property
+    def parent(self):
+        return self.__parent
+        
+    @parent.setter
+    def parent(self, parent):
+        self.__parent = parent
+        
+    @property
+    def length(self):
+        return self.__length
+        
+    @length.setter
+    def length(self, length):
+        self.__length = length
+    
+    @property
+    def p_file(self):
+        return self.__p_file
+
+    @p_file.setter
+    def p_file(self, p_file):
+        self.__p_file = p_file
 
     @property
-    def toc(self):
-        return self.__toc
+    def tex_files(self):
+        return self.__tex_files
 
-    @toc.setter
-    def toc(self, toc):
-        self.__toc = toc
+    @tex_files.setter
+    def tex_files(self, tex_files):
+        self.__tex_files = tex_files
 
-    @property
-    def files(self):
-        return self.__files
-
-    @files.setter
-    def files(self, files):
-        self.__files = files
-
-    def getFileContent(self, filename):
-        if filename not in self.toc:
-            raise ValueError("File name not in LGP file")
-        
-        start_len = self.toc[filename] + 20
-        start_pos = self.toc[filename] + 24
-        
-        length = int.from_bytes(self.files[start_len:start_pos], byteorder="little")
-        
-        return self.files[start_pos:start_pos + length].decode("utf-8")
+# Functions
 
 def ff7RotationToQuaternion(x_angle, y_angle, z_angle):
     # FF7 works with a -Y-Up coordinate system
@@ -537,61 +638,66 @@ def importLgp(context, filepath):
         if os.path.splitext(filename)[1] != ".hrc": # We only process skeletons
             continue
 
-        lines = lgp_file.getFileContent(filename).splitlines()
+        hrc_lines = lgp_file.getFileContent(filename).decode("utf-8").splitlines()
         
-        skeleton = HRCSkeleton(os.path.splitext(filename)[0], lines[1].split(" ")[1], int(lines[2].split(" ")[1]))
-        newBone = True
-        first_bone_row = 0
+        hrc_lines = [hrc_line for hrc_line in hrc_lines if hrc_line[:1] != "#"] # Removing comments
+
+        skeleton = HRCSkeleton(os.path.splitext(filename)[0], hrc_lines[1].split(" ")[1], int(hrc_lines[2].split(" ")[1]))
         name = parent = ""
         length = 0.0
-        for rownum, line in enumerate(lines[3:], start=4): # Starting right after the header
-            if line[:1] == "#": # No use of comments
-                if not newBone:
-                    first_bone_row = first_bone_row + 1 # Hack to ignore commented rows within a bone
-            elif not line.strip(): # Empty lines mark the arrival of a new bone next line
-                if name != "" and parent != "" and length != 0.0:
-                    bone = HRCBone(name, parent, length, None, None)
-                    skeleton.addBone(bone)
+        newBone = True
+        for hrc_rownum, hrc_line in enumerate(hrc_lines[3:], start=3): # Starting right after the header
+            if not hrc_line.strip(): # Empty lines mark the arrival of a new bone next line
                 name = parent = ""
                 length = 0.0
                 newBone = True
             elif newBone: # First line of a new bone
-                first_bone_row = rownum
-                name = line
+                name = hrc_line
+                parent = hrc_lines[hrc_rownum + 1]
+                length = float(hrc_lines[hrc_rownum + 2])
+                rsd = hrc_lines[hrc_rownum + 3].split()
+                p_file = None
+                tex_list = None
+                if int(rsd[0]) > 0:
+                    rsd_files = [i.lower() + ".rsd" for i in rsd[1:]] # Get list of RSD files
+                    for rsd_file in rsd_files:
+                        rsd_lines = lgp_file.getFileContent(rsd_file).decode("utf-8").splitlines()
+
+                        rsd_lines = [rsd_line for rsd_line in rsd_lines if rsd_line[:1] != "#"] # Removing comments
+
+                        # The .P file can be deduced from either PLY, GRP or MAT section
+                        # I chose PLY because it's the first one
+                        p_file = [i for i in rsd_lines if i.startswith("PLY=")][0]
+                        p_file = p_file[4:p_file.find(".")] + ".P"
+
+                        # The NTEX section gives us the number of texture files
+                        nb_tex = int([i for i in rsd_lines if i.startswith("NTEX=")][0][5:])
+                        if nb_tex > 0:
+                            # We use list comprehension to extract TEX files' names
+                            tex_list = [i[i.find("=") + 1:i.find(".")] + ".TEX" for i in rsd_lines if i.startswith("TEX[")]
+                
+                if name != "" and parent != "" and length != 0.0:
+                    bone = HRCBone(name, parent, length, p_file, tex_list)
+                    skeleton.addBone(bone)
+                
                 newBone = False
             else: # Line within a bone
-                if rownum == first_bone_row + 1: # Parent
-                    parent = line
-                elif rownum == first_bone_row + 2: # Length
-                    length = float(line)
-                elif rownum == first_bone_row + 3: # RSD files
-                    rsd = line.split(maxsplit=1)
-                    if int(rsd[0]) > 0:
-                        rsd_files = rsd[1].split()
-                        for rsd_file in rsd_files:
-                            pass
-                else:
-                    first_bone_row = first_bone_row + 1 # Unhandled row, ignoring it
-        if newBone:
-            if name != "" and parent != "" and length != 0.0: # Last bone of the model
-                bone = HRCBone(name, parent, length, None, None)
-                skeleton.addBone(bone)
-
+                continue # Already processed with the first row for each bone
+        
         skeletons.append(skeleton)
 
     # Now we have all needed objects, we can work in Blender
     for skeleton in skeletons:
         # Adding a new Scene per skeleton
-        scene = bpy.data.scenes.new(skeleton.name)
+        if skeleton.filename in SKELETONS_NAMES:
+            scene = bpy.data.scenes.new(SKELETONS_NAMES[skeleton.filename])
+        else:
+            scene = bpy.data.scenes.new(skeleton.filename)
         bpy.context.window.scene = scene
         view_layer = bpy.context.view_layer
         # Adding armature to the scene
-        if skeleton.filename in SKELETONS_NAMES:
-            armature_data = bpy.data.armatures.new(name=SKELETONS_NAMES[skeleton.filename]+"_root") # The Armature will represent the root bone for transformation purposes
-            armature_obj = bpy.data.objects.new(name=SKELETONS_NAMES[skeleton.filename], object_data=armature_data)
-        else:
-            armature_data = bpy.data.armatures.new(name=skeleton.filename+"_root") # The Armature will represent the root bone for transformation purposes
-            armature_obj = bpy.data.objects.new(name=skeleton.filename, object_data=armature_data)
+        armature_data = bpy.data.armatures.new(name=skeleton.name+"_root") # The Armature will represent the root bone for transformation purposes
+        armature_obj = bpy.data.objects.new(name=skeleton.name, object_data=armature_data)
         view_layer.active_layer_collection.collection.objects.link(armature_obj)
         armature_obj.select_set(True)
         view_layer.objects.active = armature_obj
@@ -660,6 +766,8 @@ def importLgp(context, filepath):
         bpy.ops.object.mode_set(mode="OBJECT")
             
     return {'FINISHED'}
+
+# Code taken from Blender import template
 
 # ImportHelper is a helper class, defines filename and
 # invoke() function which calls the file selector.
