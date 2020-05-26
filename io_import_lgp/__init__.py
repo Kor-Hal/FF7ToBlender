@@ -426,12 +426,12 @@ class LGPFile:
             self.toc[filename] = first_offset
             offset += 3 # Avoiding useless information
         for _ in range(nb_files - 1): # Now we process all remaining files
-            filename, file_offset = struct.unpack("<20sI", data[offset:offset + 24])
+            filename, fileOffset = struct.unpack("<20sI", data[offset:offset + 24])
             filename = filename.decode("utf-8").rstrip('\x00')
             offset += 24
-            if file_offset < first_offset:
-                first_offset = file_offset
-            self.toc[filename] = file_offset
+            if fileOffset < first_offset:
+                first_offset = fileOffset
+            self.toc[filename] = fileOffset
             offset += 3 # Avoiding useless information
         self.toc = { k : v - first_offset for k, v in self.toc.items() } # Modify every offset to remove header and CRC length
         self.files = data[first_offset:] # Storing all files' data
@@ -474,7 +474,7 @@ class LZSSFile:
 
         # Header is 4 bytes defining the file's length, not including itself
         header, = struct.unpack("<I", data[:4])
-        file_offset = 4
+        fileOffset = 4
         if len(data) - 4 != header:
             raise ValueError("Not a valid LZSS file : File size {} doesn't match header's information {}".format(len(data), header + 4))
             
@@ -483,19 +483,20 @@ class LZSSFile:
 
         # Format : https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Storer%E2%80%93Szymanski
         # Each block of data consists of 1 Control Byte and 8 pieces of data (of variable lengths)
-        while file_offset < len(data):
-            controlByte = data[file_offset]
-            file_offset += 1
-            controlBits = bin(int.from_bytes(controlByte, byteorder="little"))[2:].zfill(8)
+        while fileOffset < len(data):
+            controlByte = data[fileOffset]
+            fileOffset += 1
+            controlBits = bin(controlByte)[2:].zfill(8)
             for bit in reversed(controlBits): # Bits are read LSB-first
                 if bit == "1": # Literal data
-                    buffer[bufferPos] = int.from_bytes(data[file_offset], byteorder="little")
-                    file_offset += 1
+                    buffer[bufferPos] = data[fileOffset]
+                    fileOffset += 1
                     self.uncompressedData.append(buffer[bufferPos])
                     bufferPos += 1
                     bufferPos &= (len(buffer) - 1) # If we reach the last index, we start at 0
                 else: # Reference
-                    ref = data[file_offset:file_offset + 2]
+                    ref = data[fileOffset:fileOffset + 2]
+                    fileOffset += 2
                     if len(ref) == 0: # We reached the end of the file
                         break
                     elif len(ref) == 1: # Specific case of a 1 Byte reference -> OOOOLLLL
@@ -650,13 +651,58 @@ class FieldModule:
                 self.__animations = animations
 
 class HRCSkeleton:
-    def __init__(self, filename, name, nb_bones):
+    def __init__(self, filename, hrcData, charLGPFile):
         self.filename = filename
-        self.name = name
-        self.nb_bones = nb_bones
-        self.bones = {}
-        self.p_file = None
-        self.tex_files = None
+        self.pFile = None
+        self.texFiles = None
+
+        hrcLines = hrcData.decode("utf-8").splitlines()
+        
+        hrcLines = [hrcLine for hrcLine in hrcLines if hrcLine[:1] != "#"] # Removing comments
+
+        self.name = hrcLines[1].split(" ")[1]
+        self.nbBones = int(hrcLines[2].split(" ")[1])
+        self.bones = []
+        name = parent = ""
+        length = 0.0
+        newBone = True
+        for hrcRownum, hrcLine in enumerate(hrcLines[3:], start=3): # Starting right after the header
+            if not hrcLine.strip(): # Empty lines mark the arrival of a new bone next line
+                name = parent = ""
+                length = 0.0
+                newBone = True
+            elif newBone: # First line of a new bone
+                name = hrcLine
+                parent = hrcLines[hrcRownum + 1]
+                length = float(hrcLines[hrcRownum + 2])
+                rsd = hrcLines[hrcRownum + 3].split()
+                pFile = None
+                texList = None
+                if int(rsd[0]) > 0:
+                    rsdFiles = [i.lower() + ".rsd" for i in rsd[1:]] # Get list of RSD files
+                    for rsdFile in rsdFiles:
+                        rsdLines = charLGPFile.getFileContent(rsdFile).decode("utf-8").splitlines()
+
+                        rsdLines = [rsdLine for rsdLine in rsdLines if rsdLine[:1] != "#"] # Removing comments
+
+                        # The .P file can be deduced from either PLY, GRP or MAT section
+                        # I chose PLY because it's the first one
+                        pFile = [i.lower() for i in rsdLines if i.startswith("PLY=")][0]
+                        pFile = os.path.splitext(pFile)[0] + ".p"
+
+                        # The NTEX section gives us the number of texture files
+                        nbTex = int([i for i in rsdLines if i.startswith("NTEX=")][0][5:])
+                        if nbTex > 0:
+                            # We use list comprehension to extract TEX files' names
+                            texList = [i[i.find("=") + 1:i.find(".")].lower() + ".tex" for i in rsdLines if i.startswith("TEX[")]
+            
+                if name != "" and parent != "" and length != 0.0:
+                    bone = self.HRCBone(name, parent, length, pFile, texList)
+                    self.bones.append(bone)
+            
+                newBone = False
+            else: # Line within a bone
+                continue # Already processed with the first row for each bone
     
     @property
     def filename(self):
@@ -675,12 +721,12 @@ class HRCSkeleton:
         self.__name = name
         
     @property
-    def nb_bones(self):
-        return self.__nb_bones
+    def nbBones(self):
+        return self.__nbBones
     
-    @nb_bones.setter
-    def nb_bones(self, nb_bones):
-        self.__nb_bones = nb_bones if nb_bones > 0 else 1 # Default number of bones is 1
+    @nbBones.setter
+    def nbBones(self, nbBones):
+        self.__nbBones = nbBones if nbBones > 0 else 1 # Default number of bones is 1
         
     @property
     def bones(self):
@@ -690,59 +736,99 @@ class HRCSkeleton:
     def bones(self, bones):
         self.__bones = bones
         
-    def getBone(self, name):
-        return self.bones[name]
+    class HRCBone:
+        def __init__(self, name, parent, length, pFile, texFiles):
+            self.name = name
+            self.parent = parent
+            self.length = length
+            self.pFile = pFile
+            self.texFiles = texFiles
+            
+        @property
+        def name(self):
+            return self.__name
+            
+        @name.setter
+        def name(self, name):
+            self.__name = name
+            
+        @property
+        def parent(self):
+            return self.__parent
+            
+        @parent.setter
+        def parent(self, parent):
+            self.__parent = parent
+            
+        @property
+        def length(self):
+            return self.__length
+            
+        @length.setter
+        def length(self, length):
+            self.__length = length
         
-    def addBone(self, bone):
-        self.bones[bone.name] = bone
+        @property
+        def pFile(self):
+            return self.__pFile
 
-class HRCBone:
-    def __init__(self, name, parent, length, p_file, tex_files):
-        self.name = name
-        self.parent = parent
-        self.length = length
-        self.p_file = p_file
-        self.tex_files = tex_files
-        
+        @pFile.setter
+        def pFile(self, pFile):
+            self.__pFile = pFile
+
+        @property
+        def texFiles(self):
+            return self.__texFiles
+
+        @texFiles.setter
+        def texFiles(self, texFiles):
+            self.__texFiles = texFiles
+
+class Animation:
+    def __init__(self, data):
+        self.frames = []
+        _, nbFrames, self.nbBones, firstRotation, secondRotation, thirdRotation = struct.unpack("<3I3c", data[:15])
+        offset = 36 # Header's size
+        # Converting rotations to X / Y / Z letters
+        firstRotation = chr(int.from_bytes(firstRotation, byteorder="little") + 88)
+        secondRotation = chr(int.from_bytes(secondRotation, byteorder="little") + 88)
+        thirdRotation = chr(int.from_bytes(thirdRotation, byteorder="little") + 88)
+
+        self.rotationOrder = "{}{}{}".format(firstRotation, secondRotation, thirdRotation)
+
+        # Getting all frames info
+        for _ in range(nbFrames):
+            rootRotation = list(struct.unpack("<3f", data[offset:offset + 12]))
+            offset += 12
+            rootTranslation = list(struct.unpack("<3f", data[offset:offset + 12]))
+            offset += 12
+            rotations = list(struct.unpack("<{}f".format(self.nbBones * 3), data[offset:offset + self.nbBones * 12]))
+            offset += self.nbBones * 12
+            self.frames.append({ "rootRotation" : rootRotation, "rootTranslation" : rootTranslation, "rotations" : rotations })
+
     @property
-    def name(self):
-        return self.__name
-        
-    @name.setter
-    def name(self, name):
-        self.__name = name
-        
-    @property
-    def parent(self):
-        return self.__parent
-        
-    @parent.setter
-    def parent(self, parent):
-        self.__parent = parent
-        
-    @property
-    def length(self):
-        return self.__length
-        
-    @length.setter
-    def length(self, length):
-        self.__length = length
+    def frames(self):
+        return self.__frames
+
+    @frames.setter
+    def frames(self, frames):
+        self.__frames = frames
     
     @property
-    def p_file(self):
-        return self.__p_file
+    def nbBones(self):
+        return self.__nbBones
 
-    @p_file.setter
-    def p_file(self, p_file):
-        self.__p_file = p_file
+    @nbBones.setter
+    def nbBones(self, nbBones):
+        self.__nbBones = nbBones
 
     @property
-    def tex_files(self):
-        return self.__tex_files
+    def rotationOrder(self):
+        return self.__rotationOrder
 
-    @tex_files.setter
-    def tex_files(self, tex_files):
-        self.__tex_files = tex_files
+    @rotationOrder.setter
+    def rotationOrder(self, rotationOrder):
+        self.__rotationOrder = rotationOrder
 
 # Functions
 
@@ -763,150 +849,120 @@ def importLgp(context, filepath):
     # Loading Python objects (do not put Blender related stuff in there)
     path = os.path.dirname(filepath)
     
-    flevel = LGPFile(filepath)
-    char_filepath = os.path.join(path, "char.lgp")
-    if not os.path.exists(char_filepath):
-        raise FileNotFoundError(char_filepath)
-    char = LGPFile.fromFile(char_filepath)
-    models = []
+    flevelLGP = LGPFile.fromFile(filepath)
+    charFilepath = os.path.join(path, "char.lgp")
+    if not os.path.exists(charFilepath):
+        raise FileNotFoundError(charFilepath)
+    charLGP = LGPFile.fromFile(charFilepath)
+    models = {}
 
-    for filename in flevel.toc:
-        field = LZSSFile(flevel.getFileContent(filename))
+    for filename in flevelLGP.toc:
+        try:
+            field = LZSSFile(flevelLGP.getFileContent(filename))
+        except:
+            continue # Not a valid LZSS file, we skip it
         field = FieldModule(field.uncompressedData)
 
-        for model in field.sections[3].models.items(): # Section 3 of Field Module is the Model Loader
+        for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
+            skeletonFile = model.skeletonFile.lower() # Gettig the skeleton file's name
+            if not skeletonFile in models:
+                # We don't have the skeleton yet, we need to create it with an empty animations set
+                skeleton = HRCSkeleton(os.path.splitext(filename)[0], charLGP.getFileContent(skeletonFile), charLGP)
+                animations = {}
+            else:
+                # We already know the current skeleton, we take it and its animations
+                skeleton = models[skeletonFile]["skeleton"]
+                animations = models[skeletonFile]["animations"]
+
+            for animName in model.animations:
+                animName = animName.lower()
+                if not animName in animations: # No need to add already known animations
+                    animations[animName] = Animation(charLGP.getFileContent(animName))
+
+            # Storing (eventually updated) character data
+            character = { "skeleton" : skeleton, "animations" : animations }
+            models[skeletonFile] = character
+
+    # Now we have all needed objects, we can work in Blender
+    for skeleton in skeletons:
+        # Adding a new Scene per skeleton
+        if skeleton.filename in SKELETONS_NAMES:
+            scene = bpy.data.scenes.new(SKELETONS_NAMES[skeleton.filename])
+        else:
+            scene = bpy.data.scenes.new(skeleton.filename)
+        bpy.context.window.scene = scene
+        view_layer = bpy.context.view_layer
+        # Adding armature to the scene
+        armature_data = bpy.data.armatures.new(name=skeleton.name+"_root") # The Armature will represent the root bone for transformation purposes
+        armature_obj = bpy.data.objects.new(name=skeleton.name, object_data=armature_data)
+        view_layer.active_layer_collection.collection.objects.link(armature_obj)
+        armature_obj.select_set(True)
+        view_layer.objects.active = armature_obj
+        bpy.ops.object.mode_set(mode="EDIT")
+        armature_obj.rotation_mode = "QUATERNION"
+        # Defining root rotation
+        armature_obj.rotation_quaternion = ff7RotationToQuaternion(0.0, 0.0, 0.0) # TODO : Remove this and put real values
+        # Adding bones to armature
+        edit_bones = armature_data.edit_bones
+        for bone in skeleton.bones.values():
+            parent_name = skeleton.bones[bone.name].parent
+            cur_bone = edit_bones.new(bone.name)
+            cur_bone.length = skeleton.bones[bone.name].length
+            if parent_name != "root":
+                cur_bone.translate(edit_bones[parent_name].tail)
+                cur_bone.parent = edit_bones[parent_name]
+                cur_bone.use_connect = True
+        view_layer.objects.active = armature_obj
+        bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff. Not sure if really needed
+        # Defining bones' rotations
+        bpy.ops.object.mode_set(mode="POSE")
+        for poseBone in armature_obj.pose.bones: # TODO : Remove hardcoded values
+            if poseBone.name == "hip":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(270.0,0.0,0.0) # TODO : Remove this and put real values
+            elif poseBone.name == "chest":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(352.5625,0.0,356.0) # TODO : Remove this and put real values
+            elif poseBone.name == "head":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(13.4375,0.0,3.0) # TODO : Remove this and put real values
+            elif poseBone.name == "l_chest":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(347.0,324.84375,77.34375) # TODO : Remove this and put real values
+            elif poseBone.name == "l_collar":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(306.0,317.0,22.0) # TODO : Remove this and put real values
+            elif poseBone.name == "l_uparm":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(301.0,44.0,45.0) # TODO : Remove this and put real values
+            elif poseBone.name == "l_foarm":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(347.343811035156,0.0,0.0) # TODO : Remove this and put real values
+            elif poseBone.name == "l_hand":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,0.0,0.0) # TODO : Remove this and put real values
+            elif poseBone.name == "r_chest":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(350.15625,35.15625,282.65625) # TODO : Remove this and put real values
+            elif poseBone.name == "r_collar":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(303.75,30.9375,324.84375) # TODO : Remove this and put real values
+            elif poseBone.name == "r_uparm":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(289.0,37.9687995910645,229.218795776367) # TODO : Remove this and put real values
+            elif poseBone.name == "r_foarm":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(341.718811035156,0.0,0.0) # TODO : Remove this and put real values
+            elif poseBone.name == "r_hand":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,0.0,0.0) # TODO : Remove this and put real values
+            elif poseBone.name == "l_hip":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,251.71875,180.0) # TODO : Remove this and put real values
+            elif poseBone.name == "l_femur":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(298.125,255.9375,175.781295776367) # TODO : Remove this and put real values
+            elif poseBone.name == "l_tibia":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(12.6562004089355,0.0,0.0) # TODO : Remove this and put real values
+            elif poseBone.name == "l_foot":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(275.625,340.3125,22.5) # TODO : Remove this and put real values
+            elif poseBone.name == "r_hip":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,108.28125,180.0) # TODO : Remove this and put real values
+            elif poseBone.name == "r_femur":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(296.718811035156,289.6875,0.0) # TODO : Remove this and put real values
+            elif poseBone.name == "r_tibia":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(23.9062004089355,0.0,0.0) # TODO : Remove this and put real values
+            elif poseBone.name == "r_foot":
+                poseBone.rotation_quaternion = ff7RotationToQuaternion(270.0,177.1875,180.0) # TODO : Remove this and put real values
+        view_layer.objects.active = armature_obj
+        bpy.ops.object.mode_set(mode="OBJECT")
             
-            hrcFile = model.skeletonFile.lower()
-
-
-            hrc_lines = lgp_file.getFileContent(hrc_file).decode("utf-8").splitlines()
-            
-            hrc_lines = [hrc_line for hrc_line in hrc_lines if hrc_line[:1] != "#"] # Removing comments
-
-            skeleton = HRCSkeleton(os.path.splitext(filename)[0], hrc_lines[1].split(" ")[1], int(hrc_lines[2].split(" ")[1]))
-            name = parent = ""
-            length = 0.0
-            newBone = True
-            for hrc_rownum, hrc_line in enumerate(hrc_lines[3:], start=3): # Starting right after the header
-                if not hrc_line.strip(): # Empty lines mark the arrival of a new bone next line
-                    name = parent = ""
-                    length = 0.0
-                    newBone = True
-                elif newBone: # First line of a new bone
-                    name = hrc_line
-                    parent = hrc_lines[hrc_rownum + 1]
-                    length = float(hrc_lines[hrc_rownum + 2])
-                    rsd = hrc_lines[hrc_rownum + 3].split()
-                    p_file = None
-                    tex_list = None
-                    if int(rsd[0]) > 0:
-                        rsd_files = [i.lower() + ".rsd" for i in rsd[1:]] # Get list of RSD files
-                        for rsd_file in rsd_files:
-                            rsd_lines = lgp_file.getFileContent(rsd_file).decode("utf-8").splitlines()
-
-                            rsd_lines = [rsd_line for rsd_line in rsd_lines if rsd_line[:1] != "#"] # Removing comments
-
-                            # The .P file can be deduced from either PLY, GRP or MAT section
-                            # I chose PLY because it's the first one
-                            p_file = [i for i in rsd_lines if i.startswith("PLY=")][0]
-                            p_file = p_file[4:p_file.find(".")] + ".P"
-
-                            # The NTEX section gives us the number of texture files
-                            nb_tex = int([i for i in rsd_lines if i.startswith("NTEX=")][0][5:])
-                            if nb_tex > 0:
-                                # We use list comprehension to extract TEX files' names
-                                tex_list = [i[i.find("=") + 1:i.find(".")] + ".TEX" for i in rsd_lines if i.startswith("TEX[")]
-                
-                    if name != "" and parent != "" and length != 0.0:
-                        bone = HRCBone(name, parent, length, p_file, tex_list)
-                        skeleton.addBone(bone)
-                
-                    newBone = False
-                else: # Line within a bone
-                    continue # Already processed with the first row for each bone
-        
-            skeletons.append(skeleton)
-
-            # Now we have all needed objects, we can work in Blender
-            for skeleton in skeletons:
-                # Adding a new Scene per skeleton
-                if skeleton.filename in SKELETONS_NAMES:
-                    scene = bpy.data.scenes.new(SKELETONS_NAMES[skeleton.filename])
-                else:
-                    scene = bpy.data.scenes.new(skeleton.filename)
-                bpy.context.window.scene = scene
-                view_layer = bpy.context.view_layer
-                # Adding armature to the scene
-                armature_data = bpy.data.armatures.new(name=skeleton.name+"_root") # The Armature will represent the root bone for transformation purposes
-                armature_obj = bpy.data.objects.new(name=skeleton.name, object_data=armature_data)
-                view_layer.active_layer_collection.collection.objects.link(armature_obj)
-                armature_obj.select_set(True)
-                view_layer.objects.active = armature_obj
-                bpy.ops.object.mode_set(mode="EDIT")
-                armature_obj.rotation_mode = "QUATERNION"
-                # Defining root rotation
-                armature_obj.rotation_quaternion = ff7RotationToQuaternion(0.0, 0.0, 0.0) # TODO : Remove this and put real values
-                # Adding bones to armature
-                edit_bones = armature_data.edit_bones
-                for bone in skeleton.bones.values():
-                    parent_name = skeleton.bones[bone.name].parent
-                    cur_bone = edit_bones.new(bone.name)
-                    cur_bone.length = skeleton.bones[bone.name].length
-                    if parent_name != "root":
-                        cur_bone.translate(edit_bones[parent_name].tail)
-                        cur_bone.parent = edit_bones[parent_name]
-                        cur_bone.use_connect = True
-                view_layer.objects.active = armature_obj
-                bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff. Not sure if really needed
-                # Defining bones' rotations
-                bpy.ops.object.mode_set(mode="POSE")
-                for poseBone in armature_obj.pose.bones: # TODO : Remove hardcoded values
-                    if poseBone.name == "hip":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(270.0,0.0,0.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "chest":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(352.5625,0.0,356.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "head":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(13.4375,0.0,3.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_chest":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(347.0,324.84375,77.34375) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_collar":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(306.0,317.0,22.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_uparm":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(301.0,44.0,45.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_foarm":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(347.343811035156,0.0,0.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_hand":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,0.0,0.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_chest":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(350.15625,35.15625,282.65625) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_collar":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(303.75,30.9375,324.84375) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_uparm":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(289.0,37.9687995910645,229.218795776367) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_foarm":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(341.718811035156,0.0,0.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_hand":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,0.0,0.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_hip":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,251.71875,180.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_femur":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(298.125,255.9375,175.781295776367) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_tibia":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(12.6562004089355,0.0,0.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "l_foot":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(275.625,340.3125,22.5) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_hip":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,108.28125,180.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_femur":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(296.718811035156,289.6875,0.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_tibia":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(23.9062004089355,0.0,0.0) # TODO : Remove this and put real values
-                    elif poseBone.name == "r_foot":
-                        poseBone.rotation_quaternion = ff7RotationToQuaternion(270.0,177.1875,180.0) # TODO : Remove this and put real values
-                view_layer.objects.active = armature_obj
-                bpy.ops.object.mode_set(mode="OBJECT")
-            
-     return {'FINISHED'}
+    return {'FINISHED'}
 
 # Code taken from Blender import template
 
