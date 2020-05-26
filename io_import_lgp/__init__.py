@@ -867,7 +867,7 @@ def importLgp(context, filepath):
             skeletonFile = model.skeletonFile.lower() # Gettig the skeleton file's name
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
-                skeleton = HRCSkeleton(os.path.splitext(filename)[0], charLGP.getFileContent(skeletonFile), charLGP)
+                skeleton = HRCSkeleton(os.path.splitext(skeletonFile)[0], charLGP.getFileContent(skeletonFile), charLGP)
                 animations = {}
             else:
                 # We already know the current skeleton, we take it and its animations
@@ -884,17 +884,17 @@ def importLgp(context, filepath):
             models[skeletonFile] = character
 
     # Now we have all needed objects, we can work in Blender
-    for skeleton in skeletons:
-        # Adding a new Scene per skeleton
-        if skeleton.filename in SKELETONS_NAMES:
-            scene = bpy.data.scenes.new(SKELETONS_NAMES[skeleton.filename])
+    for model in models.values():
+        # Adding a new Scene per model
+        if model["skeleton"].filename in SKELETONS_NAMES:
+            scene = bpy.data.scenes.new(SKELETONS_NAMES[model["skeleton"].filename])
         else:
-            scene = bpy.data.scenes.new(skeleton.filename)
+            scene = bpy.data.scenes.new(model["skeleton"].filename)
         bpy.context.window.scene = scene
         view_layer = bpy.context.view_layer
         # Adding armature to the scene
-        armature_data = bpy.data.armatures.new(name=skeleton.name+"_root") # The Armature will represent the root bone for transformation purposes
-        armature_obj = bpy.data.objects.new(name=skeleton.name, object_data=armature_data)
+        armature_data = bpy.data.armatures.new(name=model["skeleton"].name+"_root") # The Armature will represent the root bone for transformation purposes
+        armature_obj = bpy.data.objects.new(name=model["skeleton"].name, object_data=armature_data)
         view_layer.active_layer_collection.collection.objects.link(armature_obj)
         armature_obj.select_set(True)
         view_layer.objects.active = armature_obj
@@ -902,12 +902,14 @@ def importLgp(context, filepath):
         armature_obj.rotation_mode = "QUATERNION"
         # Defining root rotation
         armature_obj.rotation_quaternion = ff7RotationToQuaternion(0.0, 0.0, 0.0) # TODO : Remove this and put real values
+        # And root translation
+        
         # Adding bones to armature
         edit_bones = armature_data.edit_bones
-        for bone in skeleton.bones.values():
-            parent_name = skeleton.bones[bone.name].parent
+        for bone in model["skeleton"].bones.values():
+            parent_name = model["skeleton"].bones[bone.name].parent
             cur_bone = edit_bones.new(bone.name)
-            cur_bone.length = skeleton.bones[bone.name].length
+            cur_bone.length = model["skeleton"].bones[bone.name].length
             if parent_name != "root":
                 cur_bone.translate(edit_bones[parent_name].tail)
                 cur_bone.parent = edit_bones[parent_name]
