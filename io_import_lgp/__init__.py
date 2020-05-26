@@ -804,7 +804,7 @@ class Animation:
             offset += 12
             rotations = list(struct.unpack("<{}f".format(self.nbBones * 3), data[offset:offset + self.nbBones * 12]))
             offset += self.nbBones * 12
-            self.frames.append({ "rootRotation" : rootRotation, "rootTranslation" : rootTranslation, "rotations" : rotations })
+            self.frames.append({ "rootRotation" : rootRotation, "rootTranslation" : rootTranslation, "bonesRotations" : rotations })
 
     @property
     def frames(self):
@@ -857,10 +857,10 @@ def importLgp(context, filepath):
     models = {}
 
     for filename in flevelLGP.toc:
-        try:
-            field = LZSSFile(flevelLGP.getFileContent(filename))
-        except:
-            continue # Not a valid LZSS file, we skip it
+        # Avoiding non field files
+        if filename in ("maplist", "flevel.siz") or os.path.splitext(filename)[1] in (".tut", ".tex"):
+            continue
+        field = LZSSFile(flevelLGP.getFileContent(filename))
         field = FieldModule(field.uncompressedData)
 
         for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
@@ -891,77 +891,47 @@ def importLgp(context, filepath):
         else:
             scene = bpy.data.scenes.new(model["skeleton"].filename)
         bpy.context.window.scene = scene
-        view_layer = bpy.context.view_layer
+        viewLayer = bpy.context.view_layer
         # Adding armature to the scene
-        armature_data = bpy.data.armatures.new(name=model["skeleton"].name+"_root") # The Armature will represent the root bone for transformation purposes
-        armature_obj = bpy.data.objects.new(name=model["skeleton"].name, object_data=armature_data)
-        view_layer.active_layer_collection.collection.objects.link(armature_obj)
-        armature_obj.select_set(True)
-        view_layer.objects.active = armature_obj
+        armatureData = bpy.data.armatures.new(name=model["skeleton"].name+"_root") # The Armature will represent the root bone for transformation purposes
+        armatureObj = bpy.data.objects.new(name=model["skeleton"].name, object_data=armatureData)
+        viewLayer.active_layer_collection.collection.objects.link(armatureObj)
+        armatureObj.select_set(True)
+        viewLayer.objects.active = armatureObj
         bpy.ops.object.mode_set(mode="EDIT")
-        armature_obj.rotation_mode = "QUATERNION"
-        # Defining root rotation
-        armature_obj.rotation_quaternion = ff7RotationToQuaternion(0.0, 0.0, 0.0) # TODO : Remove this and put real values
-        # And root translation
-        
         # Adding bones to armature
-        edit_bones = armature_data.edit_bones
-        for bone in model["skeleton"].bones.values():
-            parent_name = model["skeleton"].bones[bone.name].parent
-            cur_bone = edit_bones.new(bone.name)
-            cur_bone.length = model["skeleton"].bones[bone.name].length
-            if parent_name != "root":
-                cur_bone.translate(edit_bones[parent_name].tail)
-                cur_bone.parent = edit_bones[parent_name]
-                cur_bone.use_connect = True
-        view_layer.objects.active = armature_obj
+        editBones = armatureData.edit_bones
+        for bone in model["skeleton"].bones:
+            parentName = bone.parent
+            curBone = editBones.new(bone.name)
+            curBone.length = bone.length
+            if parentName != "root":
+                curBone.translate(editBones[parentName].tail)
+                curBone.parent = editBones[parentName]
+                curBone.use_connect = True
+        viewLayer.objects.active = armatureObj
         bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff. Not sure if really needed
         # Defining bones' rotations
         bpy.ops.object.mode_set(mode="POSE")
-        for poseBone in armature_obj.pose.bones: # TODO : Remove hardcoded values
-            if poseBone.name == "hip":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(270.0,0.0,0.0) # TODO : Remove this and put real values
-            elif poseBone.name == "chest":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(352.5625,0.0,356.0) # TODO : Remove this and put real values
-            elif poseBone.name == "head":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(13.4375,0.0,3.0) # TODO : Remove this and put real values
-            elif poseBone.name == "l_chest":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(347.0,324.84375,77.34375) # TODO : Remove this and put real values
-            elif poseBone.name == "l_collar":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(306.0,317.0,22.0) # TODO : Remove this and put real values
-            elif poseBone.name == "l_uparm":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(301.0,44.0,45.0) # TODO : Remove this and put real values
-            elif poseBone.name == "l_foarm":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(347.343811035156,0.0,0.0) # TODO : Remove this and put real values
-            elif poseBone.name == "l_hand":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,0.0,0.0) # TODO : Remove this and put real values
-            elif poseBone.name == "r_chest":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(350.15625,35.15625,282.65625) # TODO : Remove this and put real values
-            elif poseBone.name == "r_collar":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(303.75,30.9375,324.84375) # TODO : Remove this and put real values
-            elif poseBone.name == "r_uparm":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(289.0,37.9687995910645,229.218795776367) # TODO : Remove this and put real values
-            elif poseBone.name == "r_foarm":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(341.718811035156,0.0,0.0) # TODO : Remove this and put real values
-            elif poseBone.name == "r_hand":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,0.0,0.0) # TODO : Remove this and put real values
-            elif poseBone.name == "l_hip":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,251.71875,180.0) # TODO : Remove this and put real values
-            elif poseBone.name == "l_femur":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(298.125,255.9375,175.781295776367) # TODO : Remove this and put real values
-            elif poseBone.name == "l_tibia":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(12.6562004089355,0.0,0.0) # TODO : Remove this and put real values
-            elif poseBone.name == "l_foot":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(275.625,340.3125,22.5) # TODO : Remove this and put real values
-            elif poseBone.name == "r_hip":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(0.0,108.28125,180.0) # TODO : Remove this and put real values
-            elif poseBone.name == "r_femur":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(296.718811035156,289.6875,0.0) # TODO : Remove this and put real values
-            elif poseBone.name == "r_tibia":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(23.9062004089355,0.0,0.0) # TODO : Remove this and put real values
-            elif poseBone.name == "r_foot":
-                poseBone.rotation_quaternion = ff7RotationToQuaternion(270.0,177.1875,180.0) # TODO : Remove this and put real values
-        view_layer.objects.active = armature_obj
+        armatureObj.rotation_mode = "QUATERNION"
+        for animation in model["animations"]:
+            # For each animation, create it frame by frame
+            for numFrame in range(1, len(animation.frames) + 1):
+                # Defining root rotation
+                x, y, z = struct.unpack("<3f", animation.frames[numFrame]["rootRotation"])
+                armatureObj.rotation_quaternion = ff7RotationToQuaternion(x, y, z)
+                armatureObj.keyframe_insert("rotation_quaternion", frame = numFrame)
+                # And root translation
+                armatureObj.location = list(struct.unpack("<3f", animation.frames[numFrame]["rootTranslation"]))
+                armatureObj.keyframe_insert("location", frame = numFrame)
+                # And finally bones' rotations
+                for bone in model["skeleton"].bones:
+                    curPoseBone = armatureObj.pose.bones[bone.name]
+                    pos = model["skeleton"].bones.index(bone) # Getting bone's position in list, which matches rotation's position in the animation
+                    x, y, z = struct.unpack("<3f", animation.frames[numFrame]["bonesRotations"][pos])
+                    curPoseBone.rotation_quaternion = ff7RotationToQuaternion(x, y, z)
+                    curPoseBone.keyframe_insert("rotation_quaternion", frame = numFrame)
+        viewLayer.objects.active = armatureObj
         bpy.ops.object.mode_set(mode="OBJECT")
             
     return {'FINISHED'}
