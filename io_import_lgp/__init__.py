@@ -1,11 +1,11 @@
 # Blender addon definition
 
 bl_info = {
-    "name": "Final Fantasy 7 LGP format",
+    "name": "Final Fantasy 7 flevel LGP import/export",
     "author": "Sébastien Dougnac",
     "blender": (2, 82, 0),
     "location": "File > Import-Export",
-    "description": "Import-Export LGP models and animations",
+    "description": "Import-Export flevel LGP models and animations",
     "warning": "",
     "support": 'TESTING',
     "category": "Import-Export"
@@ -681,7 +681,10 @@ class HRCSkeleton:
                 if int(rsd[0]) > 0:
                     rsdFiles = [i.lower() + ".rsd" for i in rsd[1:]] # Get list of RSD files
                     for rsdFile in rsdFiles:
-                        rsdLines = charLGPFile.getFileContent(rsdFile).decode("utf-8").splitlines()
+                        try:
+                            rsdLines = charLGPFile.getFileContent(rsdFile).decode("utf-8").splitlines()
+                        except:
+                            continue
 
                         rsdLines = [rsdLine for rsdLine in rsdLines if rsdLine[:1] != "#"] # Removing comments
 
@@ -802,7 +805,9 @@ class Animation:
             offset += 12
             rootTranslation = list(struct.unpack("<3f", data[offset:offset + 12]))
             offset += 12
-            rotations = list(struct.unpack("<{}f".format(self.nbBones * 3), data[offset:offset + self.nbBones * 12]))
+            rotations_list = list(struct.unpack("<{}f".format(self.nbBones * 3), data[offset:offset + self.nbBones * 12]))
+            it = iter(rotations_list)
+            rotations = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z rotations
             offset += self.nbBones * 12
             self.frames.append({ "rootRotation" : rootRotation, "rootTranslation" : rootTranslation, "bonesRotations" : rotations })
 
@@ -860,14 +865,20 @@ def importLgp(context, filepath):
         # Avoiding non field files
         if filename in ("maplist", "flevel.siz") or os.path.splitext(filename)[1] in (".tut", ".tex"):
             continue
-        field = LZSSFile(flevelLGP.getFileContent(filename))
+        try:
+            field = LZSSFile(flevelLGP.getFileContent(filename))
+        except:
+            continue
         field = FieldModule(field.uncompressedData)
 
         for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
             skeletonFile = model.skeletonFile.lower() # Gettig the skeleton file's name
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
-                skeleton = HRCSkeleton(os.path.splitext(skeletonFile)[0], charLGP.getFileContent(skeletonFile), charLGP)
+                try:
+                    skeleton = HRCSkeleton(os.path.splitext(skeletonFile)[0], charLGP.getFileContent(skeletonFile), charLGP)
+                except:
+                    continue
                 animations = {}
             else:
                 # We already know the current skeleton, we take it and its animations
@@ -877,7 +888,19 @@ def importLgp(context, filepath):
             for animName in model.animations:
                 animName = animName.lower()
                 if not animName in animations: # No need to add already known animations
-                    animations[animName] = Animation(charLGP.getFileContent(animName))
+                    try:
+                        animations[animName] = Animation(charLGP.getFileContent(animName))
+                    except:
+                        continue
+
+            # Checking that animations have the same number of bones as skeleton
+            # TODO : Replace this with animations = { k:v for k,v in animations.items() if skeleton.nbBones == v.nbBones }
+            for animName in list(animations.keys()):
+                if skeleton.nbBones != animations[animName].nbBones and not(skeleton.nbBones == 1 and animations[animName].nbBones == 0):
+                    # For debugging purposes
+                    print("ERROR : {} - {} {} has {} bones and its animation {} has {} bones.".format(filename, skeleton.name, skeletonFile, skeleton.nbBones, animName, animations[animName].nbBones))
+                    # Removing the incorrect animation
+                    del animations[animName]
 
             # Storing (eventually updated) character data
             character = { "skeleton" : skeleton, "animations" : animations }
@@ -914,23 +937,27 @@ def importLgp(context, filepath):
         # Defining bones' rotations
         bpy.ops.object.mode_set(mode="POSE")
         armatureObj.rotation_mode = "QUATERNION"
-        for animation in model["animations"]:
+        for animation in model["animations"].values():
             # For each animation, create it frame by frame
-            for numFrame in range(1, len(animation.frames) + 1):
+            for numFrame in range(len(animation.frames)):
                 # Defining root rotation
-                x, y, z = struct.unpack("<3f", animation.frames[numFrame]["rootRotation"])
+                x, y, z = animation.frames[numFrame]["rootRotation"]
                 armatureObj.rotation_quaternion = ff7RotationToQuaternion(x, y, z)
-                armatureObj.keyframe_insert("rotation_quaternion", frame = numFrame)
+                armatureObj.keyframe_insert("rotation_quaternion", frame = numFrame + 1)
                 # And root translation
-                armatureObj.location = list(struct.unpack("<3f", animation.frames[numFrame]["rootTranslation"]))
-                armatureObj.keyframe_insert("location", frame = numFrame)
+                armatureObj.location = animation.frames[numFrame]["rootTranslation"]
+                armatureObj.keyframe_insert("location", frame = numFrame + 1)
                 # And finally bones' rotations
                 for bone in model["skeleton"].bones:
                     curPoseBone = armatureObj.pose.bones[bone.name]
                     pos = model["skeleton"].bones.index(bone) # Getting bone's position in list, which matches rotation's position in the animation
-                    x, y, z = struct.unpack("<3f", animation.frames[numFrame]["bonesRotations"][pos])
-                    curPoseBone.rotation_quaternion = ff7RotationToQuaternion(x, y, z)
-                    curPoseBone.keyframe_insert("rotation_quaternion", frame = numFrame)
+                    if pos < len(animation.frames[numFrame]["bonesRotations"]): # Avoiding index error
+                        x, y, z = animation.frames[numFrame]["bonesRotations"][pos]
+                        curPoseBone.rotation_quaternion = ff7RotationToQuaternion(x, y, z)
+                        curPoseBone.keyframe_insert("rotation_quaternion", frame = numFrame + 1)
+            if len(animation.frames): # If we have at least one frame
+                scene.frame_end = len(animation.frames)
+            break # TODO : Remove this, only for debugging purposes
         viewLayer.objects.active = armatureObj
         bpy.ops.object.mode_set(mode="OBJECT")
             
