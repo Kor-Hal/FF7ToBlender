@@ -787,23 +787,41 @@ class HRCSkeleton:
     class PFile:
         def __init__(self, filename, charLGPFile):
             data = charLGPFile.getFileContent(filename)
-            _, self.vertexType, self.nbVertices, self.nbNormals, numUnknown1, self.texCoords, self.vertexColors, self.nbEdges, self.nbPolys, numUnknown2, numUnknown3, self.nbHundreds, self.nbGroups, self.nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
+            _, vertexType, nbVertices, nbNormals, nbUnknown1, nbTexCoords, nbVertexColors, nbEdges, nbPolys, nbUnknown2, nbUnknown3, nbHundreds, nbGroups, nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
             offset = 128 # Header is 128 bytes long
-            self.bmesh = bmesh.new()
-            vertices_list = list(struct.unpack("<{}f".format(3 * self.nbVertices), data[offset:offset + 12 * self.nbVertices]))
-            offset += 12 * self.nbVertices
+            #self.bmesh = bmesh.new()
+            vertices_list = list(struct.unpack("<{}f".format(3 * nbVertices), data[offset:offset + 12 * nbVertices]))
+            offset += 12 * nbVertices
             it = iter(vertices_list)
-            vertices = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
+            vertices = [zip(it, it, it)] # Creating a list of tuples containing X,Y,Z vertices
             #for i, vertex in enumerate(vertices): # Adding vertices to the bmesh
             #    vert = self.bmesh.verts.new(co=vertex)
             #    vert.index = i # Ensuring the insertion order is the same as in the file
             #self.bmesh.ensure_lookup_table() # Mandatory after adding vertices
-            normals_list = list(struct.unpack("<{}f".format(3 * self.nbNormals), data[offset:offset + 12 * self.nbNormals]))
-            offset += 12 * self.nbNormals + 12 * numUnknown1
+            normals_list = list(struct.unpack("<{}f".format(3 * nbNormals), data[offset:offset + 12 * nbNormals]))
+            offset += 12 * nbNormals + 12 * nbUnknown1 # Avoiding unknown block
             it = iter(normals_list)
-            normals = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
+            normals = [zip(it, it, it)] # Creating a list of tuples containing X,Y,Z vertices
             #for i, normal in enumerate(normals):
-            #    self.bmesh.verts[i].normal = Vector(normal)            
+            #    self.bmesh.verts[i].normal = Vector(normal)
+            texCoords_list = list(struct.unpack("<{}f".format(2 * nbTexCoords), data[offset:offset + 8 * nbTexCoords]))
+            offset += 8 * nbTexCoords
+            it = iter(texCoords_list)
+            texCoords = [zip(it, it)] # Tex coords are tuples of X and Y coordinates
+            vertexColors_list = list(struct.unpack("<{}c".format(4 * nbVertexColors), data[offset:offset + 4 * nbVertexColors]))
+            offset += 4 * nbVertexColors
+            it = iter(vertexColors_list)
+            vertexColors = [{"b": b, "g": g, "r": r, "a": a} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
+            polygonColors_list = list(struct.unpack("<{}c".format(4 * nbPolys), data[offset:offset + 4 * nbPolys]))
+            offset += 4 * nbPolys
+            it = iter(polygonColors_list)
+            polygonColors = [{"b": b, "g": g, "r": r, "a": a} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
+            edges = [struct.unpack("<{}I".format(nbEdges), data[offset:offset + 4 * nbEdges])]
+            offset += 4 * nbEdges
+            polygons_list = list(struct.unpack("<{}H".format(12 * nbPolys), data[offset:offset + 24 * nbPolys]))
+            offset += 24 * nbPolys + 24 * nbUnknown2 + 3 * nbUnknown3 # Avoiding Unknown 2 and 3
+            it = iter(polygons_list)
+            polygons = [{"vertexIndex1": vertexIndex1, "vertexIndex2": vertexIndex2, "vertexIndex3": vertexIndex3, "normalIndex1": normalIndex1, "normalIndex2": normalIndex2, "normalIndex3": normalIndex3, "edgeIndex1":edgeIndex1, "edgeIndex2":edgeIndex2, "edgeIndex3":edgeIndex3} for _, vertexIndex1, vertexIndex2, vertexIndex3, normalIndex1, normalIndex2, normalIndex3, edgeIndex1, edgeIndex2, edgeIndex3 in zip(it, it, it, it, it, it, it, it, it, it)]
 
 class Animation:
     def __init__(self, data):
