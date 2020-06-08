@@ -819,7 +819,7 @@ class HRCSkeleton:
             edges = [struct.unpack("<{}I".format(nbEdges), data[offset:offset + 4 * nbEdges])]
             offset += 4 * nbEdges
             polygons_list = list(struct.unpack("<{}H".format(12 * nbPolys), data[offset:offset + 24 * nbPolys]))
-            offset += 24 * nbPolys + 24 * nbUnknown2 + 3 * nbUnknown3 + 108 * nbHundreds # Avoiding Unknown 2, 3 and Hundreds
+            offset += 24 * nbPolys + 24 * nbUnknown2 + 3 * nbUnknown3 + 100 * nbHundreds # Avoiding Unknown2, Unknown3 and Hundreds
             it = iter(polygons_list)
             polygons = [{"vertexIndex1":vertexIndex1, "vertexIndex2":vertexIndex2, "vertexIndex3":vertexIndex3, "normalIndex1":normalIndex1, "normalIndex2":normalIndex2, "normalIndex3":normalIndex3, "edgeIndex1":edgeIndex1, "edgeIndex2":edgeIndex2, "edgeIndex3":edgeIndex3} for _, vertexIndex1, vertexIndex2, vertexIndex3, normalIndex1, normalIndex2, normalIndex3, edgeIndex1, edgeIndex2, edgeIndex3, _, _ in zip(it, it, it, it, it, it, it, it, it, it, it, it)]
             groups_list = list(struct.unpack("<{}L".format(14 * nbGroups), data[offset:offset + 56 * nbGroups]))
