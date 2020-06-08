@@ -687,8 +687,9 @@ class HRCSkeleton:
 
                         # The .P file can be deduced from either PLY, GRP or MAT section
                         # I chose PLY because it's the first one
-                        pFile = [i.lower() for i in rsdLines if i.startswith("PLY=")][0]
+                        pFile = [i.lower() for i in rsdLines if i.startswith("PLY=")][0].split("=")[1]
                         pFile = os.path.splitext(pFile)[0] + ".p"
+                        pFile = self.PFile(charLGPFile.getFileContent(pFile))
 
                         # The NTEX section gives us the number of texture files
                         nbTex = int([i for i in rsdLines if i.startswith("NTEX=")][0][5:])
@@ -785,52 +786,94 @@ class HRCSkeleton:
             self.__texFiles = texFiles
 
     class PFile:
-        def __init__(self, filename, charLGPFile):
-            data = charLGPFile.getFileContent(filename)
+        def __init__(self, data):
             _, vertexType, nbVertices, nbNormals, nbUnknown1, nbTexCoords, nbVertexColors, nbEdges, nbPolys, nbUnknown2, nbUnknown3, nbHundreds, nbGroups, nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
             offset = 128 # Header is 128 bytes long
-            #self.bmesh = bmesh.new()
+            
             vertices_list = list(struct.unpack("<{}f".format(3 * nbVertices), data[offset:offset + 12 * nbVertices]))
             offset += 12 * nbVertices
             it = iter(vertices_list)
             vertices = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
-            #for i, vertex in enumerate(vertices): # Adding vertices to the bmesh
-            #    vert = self.bmesh.verts.new(co=vertex)
-            #    vert.index = i # Ensuring the insertion order is the same as in the file
-            #self.bmesh.ensure_lookup_table() # Mandatory after adding vertices
+            
             normals_list = list(struct.unpack("<{}f".format(3 * nbNormals), data[offset:offset + 12 * nbNormals]))
             offset += 12 * nbNormals + 12 * nbUnknown1 # Avoiding unknown block
             it = iter(normals_list)
             normals = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
-            #for i, normal in enumerate(normals):
-            #    self.bmesh.verts[i].normal = Vector(normal)
+            
             texCoords_list = list(struct.unpack("<{}f".format(2 * nbTexCoords), data[offset:offset + 8 * nbTexCoords]))
             offset += 8 * nbTexCoords
             it = iter(texCoords_list)
             texCoords = list(zip(it, it)) # Tex coords are tuples of X and Y coordinates
+            
             vertexColors_list = list(struct.unpack("<{}c".format(4 * nbVertexColors), data[offset:offset + 4 * nbVertexColors]))
             offset += 4 * nbVertexColors
             it = iter(vertexColors_list)
             vertexColors = [{"b": int.from_bytes(b, byteorder="little"), "g": int.from_bytes(g, byteorder="little"), "r": int.from_bytes(r, byteorder="little"), "a": int.from_bytes(a, byteorder="little")} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
+            
             polygonColors_list = list(struct.unpack("<{}c".format(4 * nbPolys), data[offset:offset + 4 * nbPolys]))
             offset += 4 * nbPolys
             it = iter(polygonColors_list)
             polygonColors = [{"b": int.from_bytes(b, byteorder="little"), "g": int.from_bytes(g, byteorder="little"), "r": int.from_bytes(r, byteorder="little"), "a": int.from_bytes(a, byteorder="little")} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
+            
             edges = [struct.unpack("<{}I".format(nbEdges), data[offset:offset + 4 * nbEdges])]
             offset += 4 * nbEdges
+            
             polygons_list = list(struct.unpack("<{}H".format(12 * nbPolys), data[offset:offset + 24 * nbPolys]))
             offset += 24 * nbPolys + 24 * nbUnknown2 + 3 * nbUnknown3 + 100 * nbHundreds # Avoiding Unknown2, Unknown3 and Hundreds
             it = iter(polygons_list)
             polygons = [{"vertexIndex1":vertexIndex1, "vertexIndex2":vertexIndex2, "vertexIndex3":vertexIndex3, "normalIndex1":normalIndex1, "normalIndex2":normalIndex2, "normalIndex3":normalIndex3, "edgeIndex1":edgeIndex1, "edgeIndex2":edgeIndex2, "edgeIndex3":edgeIndex3} for _, vertexIndex1, vertexIndex2, vertexIndex3, normalIndex1, normalIndex2, normalIndex3, edgeIndex1, edgeIndex2, edgeIndex3, _, _ in zip(it, it, it, it, it, it, it, it, it, it, it, it)]
+            
             groups_list = list(struct.unpack("<{}L".format(14 * nbGroups), data[offset:offset + 56 * nbGroups]))
             offset += 56 * nbGroups
             it = iter(groups_list)
             groups = [{"primitiveType":primitiveType, "polygonStartIndex":polygonStartIndex, "nbPolygons":nbPolygons, "verticesStartIndex":verticesStartIndex, "nbVertices":nbVertices, "edgeStartIndex":edgeStartIndex, "nbEdges":nbEdges, "texCoordStartIndex":texCoordStartIndex, "areTexturesUsed":areTexturesUsed, "textureNumber":textureNumber} for primitiveType, polygonStartIndex, nbPolygons, verticesStartIndex, nbVertices, edgeStartIndex, nbEdges, _, _, _, _, texCoordStartIndex, areTexturesUsed, textureNumber in zip(it, it, it, it, it, it, it, it, it, it, it, it, it, it)]
+            
             boundingBoxes_list = list(struct.unpack("<{}f".format(6 * nbBoundingBoxes), data[offset:offset + 24 * nbBoundingBoxes]))
             offset += 24 * nbBoundingBoxes
             it = iter(boundingBoxes_list)
             boundingBoxes = [[(max_x, max_y, max_z), (min_x, min_y, min_z)] for max_x, max_y, max_z, min_x, min_y, min_z in zip(it, it, it, it, it, it)]
             # Last section is Normal index table, unused
+
+            self.polygonGroups = []
+
+            for group in groups:
+                bmeshes = []
+                gr_polygons = polygons[group["polygonStartIndex"]:group["polygonStartIndex"] + group["nbPolygons"]] # Selecting group's polygons
+                for polygon in gr_polygons:
+                    bm = bmesh.new() # Creating a mesh for each polygon
+
+                    # Adding vertices
+                    polygon["vertexIndex1"] += group["verticesStartIndex"]
+                    polygon["normalIndex1"] += group["verticesStartIndex"]
+                    vert1 = bm.verts.new(co=vertices[polygon["vertexIndex1"]])
+                    vert1.normal = Vector(normals[polygon["normalIndex1"]])
+
+                    polygon["vertexIndex2"] += group["verticesStartIndex"]
+                    polygon["normalIndex2"] += group["verticesStartIndex"]
+                    vert2 = bm.verts.new(co=vertices[polygon["vertexIndex2"]])
+                    vert2.normal = Vector(normals[polygon["normalIndex2"]])
+
+                    polygon["vertexIndex3"] += group["verticesStartIndex"]
+                    polygon["normalIndex3"] += group["verticesStartIndex"]
+                    vert3 = bm.verts.new(co=vertices[polygon["vertexIndex3"]])
+                    vert3.normal = Vector(normals[polygon["normalIndex3"]])
+
+                    bm.verts.index_update()
+                    bm.ensure_lookup_table()
+
+                    bm.faces.new((vert1, vert2, vert3))
+
+                    bmeshes.append(bm)
+
+                self.polygonGroups.append(bmeshes)
+
+        @property
+        def polygonGroups(self):
+            return self.__polygonGroups
+
+        @polygonGroups.setter
+        def polygonGroups(self, polygonGroups):
+            self.__polygonGroups = polygonGroups
 
 class Animation:
     def __init__(self, data):
@@ -979,6 +1022,15 @@ def importLgp(context, filepath):
                 curBone.use_connect = True
         viewLayer.objects.active = armatureObj
         bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff. Not sure if really needed
+        # Creating meshes
+        for bone in model["skeleton"].bones:
+            for i, polygonGroup in enumerate(bone.pFile.polygonGroups):
+                for j, bm in enumerate(polygonGroup.bmeshes):
+                    mesh = bpy.data.meshes.new("{}_{}_{}".format(bone.name,i,j))
+                    obj = bpy.data.objects.new("mesh_{}".format(mesh.name), mesh)
+                    obj.show_name = True
+                    scene.objects.link(obj)
+                    bm.to_mesh(mesh)
         # Defining bones' rotations
         bpy.ops.object.mode_set(mode="POSE")
         armatureObj.rotation_mode = "QUATERNION"
