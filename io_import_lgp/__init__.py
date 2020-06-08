@@ -815,7 +815,7 @@ class HRCSkeleton:
             it = iter(polygonColors_list)
             polygonColors = [{"b": int.from_bytes(b, byteorder="little"), "g": int.from_bytes(g, byteorder="little"), "r": int.from_bytes(r, byteorder="little"), "a": int.from_bytes(a, byteorder="little")} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
             
-            edges = [struct.unpack("<{}I".format(nbEdges), data[offset:offset + 4 * nbEdges])]
+            edges = list(struct.unpack("<{}I".format(nbEdges), data[offset:offset + 4 * nbEdges]))
             offset += 4 * nbEdges
             
             polygons_list = list(struct.unpack("<{}H".format(12 * nbPolys), data[offset:offset + 24 * nbPolys]))
