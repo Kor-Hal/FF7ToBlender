@@ -650,7 +650,6 @@ class FieldModule:
 class HRCSkeleton:
     def __init__(self, filename, hrcData, charLGPFile):
         self.filename = filename
-        self.pFile = None
         self.texFiles = None
 
         hrcLines = hrcData.decode("utf-8").splitlines()
@@ -824,7 +823,7 @@ class HRCSkeleton:
             polygons = [{"vertexIndex1":vertexIndex1, "vertexIndex2":vertexIndex2, "vertexIndex3":vertexIndex3, "normalIndex1":normalIndex1, "normalIndex2":normalIndex2, "normalIndex3":normalIndex3, "edgeIndex1":edgeIndex1, "edgeIndex2":edgeIndex2, "edgeIndex3":edgeIndex3} for _, vertexIndex1, vertexIndex2, vertexIndex3, normalIndex1, normalIndex2, normalIndex3, edgeIndex1, edgeIndex2, edgeIndex3, _, _ in zip(it, it, it, it, it, it, it, it, it, it, it, it)]
             
             groups_list = list(struct.unpack("<{}L".format(14 * nbGroups), data[offset:offset + 56 * nbGroups]))
-            offset += 56 * nbGroups
+            offset += 56 * nbGroups + 4
             it = iter(groups_list)
             groups = [{"primitiveType":primitiveType, "polygonStartIndex":polygonStartIndex, "nbPolygons":nbPolygons, "verticesStartIndex":verticesStartIndex, "nbVertices":nbVertices, "edgeStartIndex":edgeStartIndex, "nbEdges":nbEdges, "texCoordStartIndex":texCoordStartIndex, "areTexturesUsed":areTexturesUsed, "textureNumber":textureNumber} for primitiveType, polygonStartIndex, nbPolygons, verticesStartIndex, nbVertices, edgeStartIndex, nbEdges, _, _, _, _, texCoordStartIndex, areTexturesUsed, textureNumber in zip(it, it, it, it, it, it, it, it, it, it, it, it, it, it)]
             
@@ -844,24 +843,23 @@ class HRCSkeleton:
 
                     # Adding vertices
                     polygon["vertexIndex1"] += group["verticesStartIndex"]
-                    polygon["normalIndex1"] += group["verticesStartIndex"]
-                    vert1 = bm.verts.new(co=vertices[polygon["vertexIndex1"]])
+                    vert1 = bm.verts.new(vertices[polygon["vertexIndex1"]])
                     vert1.normal = Vector(normals[polygon["normalIndex1"]])
 
                     polygon["vertexIndex2"] += group["verticesStartIndex"]
-                    polygon["normalIndex2"] += group["verticesStartIndex"]
-                    vert2 = bm.verts.new(co=vertices[polygon["vertexIndex2"]])
+                    vert2 = bm.verts.new(vertices[polygon["vertexIndex2"]])
                     vert2.normal = Vector(normals[polygon["normalIndex2"]])
 
                     polygon["vertexIndex3"] += group["verticesStartIndex"]
-                    polygon["normalIndex3"] += group["verticesStartIndex"]
-                    vert3 = bm.verts.new(co=vertices[polygon["vertexIndex3"]])
+                    vert3 = bm.verts.new(vertices[polygon["vertexIndex3"]])
                     vert3.normal = Vector(normals[polygon["normalIndex3"]])
 
                     bm.verts.index_update()
-                    bm.ensure_lookup_table()
+                    bm.verts.ensure_lookup_table()
 
                     bm.faces.new((vert1, vert2, vert3))
+                    bm.faces.index_update()
+                    bm.faces.ensure_lookup_table()
 
                     bmeshes.append(bm)
 
