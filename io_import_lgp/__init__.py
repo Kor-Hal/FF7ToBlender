@@ -793,12 +793,14 @@ class HRCSkeleton:
             offset += 12 * nbVertices
             it = iter(vertices_list)
             vertices = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
+            vertices = [(x, -z, y) for x, y, z in vertices] # Converting coordinates between FF7's referential and Blender's
             
             normals_list = list(struct.unpack("<{}f".format(3 * nbNormals), data[offset:offset + 12 * nbNormals]))
             offset += 12 * nbNormals + 12 * nbUnknown1 # Avoiding unknown block
             it = iter(normals_list)
             normals = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
-            
+            normals = [(x, -z, y) for x, y, z in normals] # Converting coordinates between FF7's referential and Blender's
+
             texCoords_list = list(struct.unpack("<{}f".format(2 * nbTexCoords), data[offset:offset + 8 * nbTexCoords]))
             offset += 8 * nbTexCoords
             it = iter(texCoords_list)
@@ -1051,6 +1053,9 @@ def importLgp(context, filepath):
                     meshObj.parent = armatureObj
                     meshObj.parent_bone = bone.name
                     meshObj.parent_type = 'BONE'
+
+                    meshObj.location = armatureObj.pose.bones[bone.name].head
+                    constraint = meshObj.constraints.new('COPY_TRANSFORMS')
         # Defining bones' rotations
         bpy.ops.object.mode_set(mode="POSE")
         armatureObj.rotation_mode = "QUATERNION"
