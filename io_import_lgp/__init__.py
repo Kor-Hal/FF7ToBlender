@@ -674,7 +674,7 @@ class HRCSkeleton:
                 rsd = hrcLines[hrcRownum + 3].split()
                 pFile = None
                 texList = None
-                if int(rsd[0]) > 0:
+                if int(rsd[0]): # If there's at least one RSD file
                     rsdFiles = [i.lower() + ".rsd" for i in rsd[1:]] # Get list of RSD files
                     for rsdFile in rsdFiles:
                         try:
@@ -836,34 +836,22 @@ class HRCSkeleton:
             self.polygonGroups = []
 
             for group in groups:
-                bmeshes = []
+                polys = []
                 gr_polygons = polygons[group["polygonStartIndex"]:group["polygonStartIndex"] + group["nbPolygons"]] # Selecting group's polygons
                 for polygon in gr_polygons:
-                    bm = bmesh.new() # Creating a mesh for each polygon
-
                     # Adding vertices
                     polygon["vertexIndex1"] += group["verticesStartIndex"]
-                    vert1 = bm.verts.new(vertices[polygon["vertexIndex1"]])
-                    vert1.normal = Vector(normals[polygon["normalIndex1"]])
+                    vert1 = {"vertex":vertices[polygon["vertexIndex1"]], "normal":normals[polygon["normalIndex1"]]}
 
                     polygon["vertexIndex2"] += group["verticesStartIndex"]
-                    vert2 = bm.verts.new(vertices[polygon["vertexIndex2"]])
-                    vert2.normal = Vector(normals[polygon["normalIndex2"]])
+                    vert2 = {"vertex":vertices[polygon["vertexIndex2"]], "normal":normals[polygon["normalIndex2"]]}
 
                     polygon["vertexIndex3"] += group["verticesStartIndex"]
-                    vert3 = bm.verts.new(vertices[polygon["vertexIndex3"]])
-                    vert3.normal = Vector(normals[polygon["normalIndex3"]])
+                    vert3 = {"vertex":vertices[polygon["vertexIndex3"]], "normal":normals[polygon["normalIndex3"]]}
 
-                    bm.verts.index_update()
-                    bm.verts.ensure_lookup_table()
+                    polys.append((vert1, vert2, vert3))
 
-                    bm.faces.new((vert1, vert2, vert3))
-                    bm.faces.index_update()
-                    bm.faces.ensure_lookup_table()
-
-                    bmeshes.append(bm)
-
-                self.polygonGroups.append(bmeshes)
+                self.polygonGroups.append(polys)
 
         @property
         def polygonGroups(self):
@@ -959,6 +947,9 @@ def importLgp(context, filepath):
 
         for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
             skeletonFile = model.skeletonFile.lower() # Gettig the skeleton file's name
+            # TODO : Remove this if, debug purpose
+            if skeletonFile != "aaaa.hrc":
+                continue
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
                 try:
@@ -1022,13 +1013,44 @@ def importLgp(context, filepath):
         bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff. Not sure if really needed
         # Creating meshes
         for bone in model["skeleton"].bones:
+            if bone.pFile is None:
+                print("ERROR: No P file for bone {} of skeleton {}".format(bone.name, model["skeleton"].name))
+                continue
             for i, polygonGroup in enumerate(bone.pFile.polygonGroups):
-                for j, bm in enumerate(polygonGroup.bmeshes):
-                    mesh = bpy.data.meshes.new("{}_{}_{}".format(bone.name,i,j))
-                    obj = bpy.data.objects.new("mesh_{}".format(mesh.name), mesh)
-                    obj.show_name = True
-                    scene.objects.link(obj)
-                    bm.to_mesh(mesh)
+                for j, polygon in enumerate(polygonGroup):
+                    # Creating a mesh for the current polygon and linking it to the current scene
+                    meshData = bpy.data.meshes.new("{}_{}_{}_{}".format(scene.name,bone.name,i,j))
+                    meshObj = bpy.data.objects.new("{}_mesh".format(meshData.name), meshData)
+                    meshObj.show_name = True
+                    scene.collection.objects.link(meshObj)
+                    
+                    # We'll use bmesh to define the mesh
+                    bm = bmesh.new()
+                    
+                    # Defining vertices and normals
+                    vert1 = bm.verts.new(polygon[0]["vertex"])
+                    vert1.normal = Vector(polygon[0]["normal"])
+                    vert2 = bm.verts.new(polygon[1]["vertex"])
+                    vert2.normal = Vector(polygon[1]["normal"])
+                    vert3 = bm.verts.new(polygon[2]["vertex"])
+                    vert3.normal = Vector(polygon[2]["normal"])
+                    
+                    # Mandatory functions after inserting vertices
+                    bm.verts.index_update()
+                    bm.verts.ensure_lookup_table()
+
+                    # Definining faces for the polygon
+                    bm.faces.new((vert1, vert2, vert3))
+                    bm.faces.index_update()
+                    bm.faces.ensure_lookup_table()
+
+                    # Putting information from bmesh to mesh
+                    bm.to_mesh(meshData)
+                    bm.free()
+
+                    meshObj.parent = armatureObj
+                    meshObj.parent_bone = bone.name
+                    meshObj.parent_type = 'BONE'
         # Defining bones' rotations
         bpy.ops.object.mode_set(mode="POSE")
         armatureObj.rotation_mode = "QUATERNION"
