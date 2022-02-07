@@ -680,6 +680,7 @@ class HRCSkeleton:
                         try:
                             rsdLines = charLGPFile.getFileContent(rsdFile).decode("utf-8").splitlines()
                         except:
+                            print("charLGPFile.getFileContent error : {}".format(rsdFile))
                             continue
 
                         rsdLines = [rsdLine for rsdLine in rsdLines if rsdLine[:1] != "#"] # Removing comments
@@ -944,19 +945,21 @@ def importLgp(context, filepath):
         try:
             field = LZSSFile(flevelLGP.getFileContent(filename))
         except:
+            print("LZSSFile error : {}".format(filename))
             continue
         field = FieldModule(field.uncompressedData)
 
         for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
-            skeletonFile = model.skeletonFile.lower() # Gettig the skeleton file's name
+            skeletonFile = model.skeletonFile.lower() # Getting the skeleton file's name
             # TODO : Remove this if, debug purpose
-            if skeletonFile != "aaaa.hrc":
+            if skeletonFile != "asjc.hrc":
                 continue
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
                 try:
                     skeleton = HRCSkeleton(os.path.splitext(skeletonFile)[0], charLGP.getFileContent(skeletonFile), charLGP)
                 except:
+                    print("HRCSkeleton error : {}".format(skeletonFile))
                     continue
                 animations = {}
             else:
@@ -970,6 +973,7 @@ def importLgp(context, filepath):
                     try:
                         animations[animName] = Animation(charLGP.getFileContent(animName))
                     except:
+                        print("Animation error : {}".format(animName))
                         continue
 
             # Checking that animations have the same number of bones as skeleton
