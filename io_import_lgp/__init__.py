@@ -949,9 +949,9 @@ def importLgp(context, filepath):
         field = FieldModule(field.uncompressedData)
 
         for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
-            skeletonFile = model.skeletonFile.lower() # Gettig the skeleton file's name
+            skeletonFile = model.skeletonFile.lower() # Getting the skeleton file's name
             # TODO : Remove this if, debug purpose
-            if skeletonFile != "atfe.hrc":
+            if not skeletonFile.startswith("a"):
                 continue
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
@@ -1000,7 +1000,7 @@ def importLgp(context, filepath):
         meshes = {}
         for bone in model["skeleton"].bones:
             if not bone.pFiles:
-                print("ERROR: No P file for bone {} of skeleton {}".format(bone.name, model["skeleton"].name))
+                print("WARNING: No P file for bone {} of skeleton {}".format(bone.name, model["skeleton"].name))
                 continue
             for pFile in bone.pFiles:
                 for i, polygonGroup in enumerate(pFile.polygonGroups):
