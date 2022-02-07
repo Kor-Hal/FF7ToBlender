@@ -994,26 +994,9 @@ def importLgp(context, filepath):
             scene = bpy.data.scenes.new(model["skeleton"].filename)
         bpy.context.window.scene = scene
         viewLayer = bpy.context.view_layer
-        # Adding armature to the scene
-        armatureData = bpy.data.armatures.new(name=model["skeleton"].name+"_root") # The Armature will represent the root bone for transformation purposes
-        armatureObj = bpy.data.objects.new(name=model["skeleton"].name, object_data=armatureData)
-        viewLayer.active_layer_collection.collection.objects.link(armatureObj)
-        armatureObj.select_set(True)
-        viewLayer.objects.active = armatureObj
-        bpy.ops.object.mode_set(mode="EDIT")
-        # Adding bones to armature
-        editBones = armatureData.edit_bones
-        for bone in model["skeleton"].bones:
-            parentName = bone.parent
-            curBone = editBones.new(bone.name)
-            curBone.length = bone.length
-            if parentName != "root":
-                curBone.translate(editBones[parentName].tail)
-                curBone.parent = editBones[parentName]
-                curBone.use_connect = True
-        viewLayer.objects.active = armatureObj
-        bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff. Not sure if really needed
+
         # Creating meshes
+        meshes = {}
         for bone in model["skeleton"].bones:
             if bone.pFile is None:
                 print("ERROR: No P file for bone {} of skeleton {}".format(bone.name, model["skeleton"].name))
@@ -1021,9 +1004,8 @@ def importLgp(context, filepath):
             for i, polygonGroup in enumerate(bone.pFile.polygonGroups):
                 for j, polygon in enumerate(polygonGroup):
                     # Creating a mesh for the current polygon and linking it to the current scene
-                    meshData = bpy.data.meshes.new("{}_{}_{}_{}".format(scene.name,bone.name,i,j))
+                    meshData = bpy.data.meshes.new("{}_{}_{}".format(bone.name,i,j))
                     meshObj = bpy.data.objects.new("{}_mesh".format(meshData.name), meshData)
-                    meshObj.show_name = True
                     scene.collection.objects.link(meshObj)
                     
                     # We'll use bmesh to define the mesh
@@ -1050,12 +1032,42 @@ def importLgp(context, filepath):
                     bm.to_mesh(meshData)
                     bm.free()
 
-                    meshObj.parent = armatureObj
-                    meshObj.parent_bone = bone.name
-                    meshObj.parent_type = 'BONE'
+                    # Storing the mesh object to link it later to the corresponding bone
+                    if bone.name not in meshes:
+                        meshes[bone.name] = [meshObj]
+                    else:
+                        meshes[bone.name].append(meshObj)
 
-                    meshObj.location = armatureObj.pose.bones[bone.name].head
-                    constraint = meshObj.constraints.new('COPY_TRANSFORMS')
+        # Adding armature to the scene
+        armatureData = bpy.data.armatures.new(name=model["skeleton"].name+"_root") # The Armature will represent the root bone for transformation purposes
+        armatureObj = bpy.data.objects.new(name=model["skeleton"].name, object_data=armatureData)
+        viewLayer.active_layer_collection.collection.objects.link(armatureObj)
+        armatureObj.select_set(True)
+        viewLayer.objects.active = armatureObj
+        bpy.ops.object.mode_set(mode="EDIT")
+        # Adding bones to armature
+        editBones = armatureData.edit_bones
+        for bone in model["skeleton"].bones:
+            parentName = bone.parent
+            curBone = editBones.new(bone.name)
+            curBone.length = bone.length
+            if parentName != "root":
+                curBone.translate(editBones[parentName].tail)
+                curBone.parent = editBones[parentName]
+                curBone.use_connect = True
+            # Linking meshes to the corresponding bone
+            if bone.name in meshes:
+                for mesh in meshes[bone.name]:
+                    mesh.parent = armatureObj
+                    mesh.parent_bone = bone.name
+                    mesh.parent_type = 'BONE'
+                    constraint = mesh.constraints.new('COPY_TRANSFORMS')
+                    constraint.target = armatureObj
+                    constraint.subtarget = bone.name
+
+        viewLayer.objects.active = armatureObj
+        bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff
+        
         # Defining bones' rotations
         bpy.ops.object.mode_set(mode="POSE")
         armatureObj.rotation_mode = "QUATERNION"
@@ -1080,8 +1092,6 @@ def importLgp(context, filepath):
             if len(animation.frames): # If we have at least one frame
                 scene.frame_end = len(animation.frames)
             break # TODO : Remove this, only for debugging purposes
-        viewLayer.objects.active = armatureObj
-        bpy.ops.object.mode_set(mode="OBJECT")
             
     return {'FINISHED'}
 
