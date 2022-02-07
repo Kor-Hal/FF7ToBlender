@@ -672,8 +672,8 @@ class HRCSkeleton:
                 parent = hrcLines[hrcRownum + 1]
                 length = float(hrcLines[hrcRownum + 2])
                 rsd = hrcLines[hrcRownum + 3].split()
-                pFile = None
-                texList = None
+                pFileList = []
+                texList = []
                 if int(rsd[0]): # If there's at least one RSD file
                     rsdFiles = [i.lower() + ".rsd" for i in rsd[1:]] # Get list of RSD files
                     for rsdFile in rsdFiles:
@@ -689,6 +689,7 @@ class HRCSkeleton:
                         pFile = [i.lower() for i in rsdLines if i.startswith("PLY=")][0].split("=")[1]
                         pFile = os.path.splitext(pFile)[0] + ".p"
                         pFile = self.PFile(charLGPFile.getFileContent(pFile))
+                        pFileList.append(pFile)
 
                         # The NTEX section gives us the number of texture files
                         nbTex = int([i for i in rsdLines if i.startswith("NTEX=")][0][5:])
@@ -697,7 +698,7 @@ class HRCSkeleton:
                             texList = [i[i.find("=") + 1:i.find(".")].lower() + ".tex" for i in rsdLines if i.startswith("TEX[")]
             
                 if name != "" and parent != "" and length != 0.0:
-                    bone = self.HRCBone(name, parent, length, pFile, texList)
+                    bone = self.HRCBone(name, parent, length, pFileList, texList)
                     self.bones.append(bone)
             
                 newBone = False
@@ -737,11 +738,11 @@ class HRCSkeleton:
         self.__bones = bones
         
     class HRCBone:
-        def __init__(self, name, parent, length, pFile, texFiles):
+        def __init__(self, name, parent, length, pFiles, texFiles):
             self.name = name
             self.parent = parent
             self.length = length
-            self.pFile = pFile
+            self.pFiles = pFiles
             self.texFiles = texFiles
             
         @property
@@ -769,12 +770,12 @@ class HRCSkeleton:
             self.__length = length
         
         @property
-        def pFile(self):
-            return self.__pFile
+        def pFiles(self):
+            return self.__pFiles
 
-        @pFile.setter
-        def pFile(self, pFile):
-            self.__pFile = pFile
+        @pFiles.setter
+        def pFiles(self, pFiles):
+            self.__pFiles = pFiles
 
         @property
         def texFiles(self):
@@ -950,7 +951,7 @@ def importLgp(context, filepath):
         for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
             skeletonFile = model.skeletonFile.lower() # Gettig the skeleton file's name
             # TODO : Remove this if, debug purpose
-            if skeletonFile != "aaaa.hrc":
+            if skeletonFile != "atfe.hrc":
                 continue
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
@@ -998,45 +999,46 @@ def importLgp(context, filepath):
         # Creating meshes
         meshes = {}
         for bone in model["skeleton"].bones:
-            if bone.pFile is None:
+            if not bone.pFiles:
                 print("ERROR: No P file for bone {} of skeleton {}".format(bone.name, model["skeleton"].name))
                 continue
-            for i, polygonGroup in enumerate(bone.pFile.polygonGroups):
-                for j, polygon in enumerate(polygonGroup):
-                    # Creating a mesh for the current polygon and linking it to the current scene
-                    meshData = bpy.data.meshes.new("{}_{}_{}".format(bone.name,i,j))
-                    meshObj = bpy.data.objects.new("{}_mesh".format(meshData.name), meshData)
-                    scene.collection.objects.link(meshObj)
-                    
-                    # We'll use bmesh to define the mesh
-                    bm = bmesh.new()
-                    
-                    # Defining vertices and normals
-                    vert1 = bm.verts.new(polygon[0]["vertex"])
-                    vert1.normal = Vector(polygon[0]["normal"])
-                    vert2 = bm.verts.new(polygon[1]["vertex"])
-                    vert2.normal = Vector(polygon[1]["normal"])
-                    vert3 = bm.verts.new(polygon[2]["vertex"])
-                    vert3.normal = Vector(polygon[2]["normal"])
-                    
-                    # Mandatory functions after inserting vertices
-                    bm.verts.index_update()
-                    bm.verts.ensure_lookup_table()
+            for pFile in bone.pFiles:
+                for i, polygonGroup in enumerate(pFile.polygonGroups):
+                    for j, polygon in enumerate(polygonGroup):
+                        # Creating a mesh for the current polygon and linking it to the current scene
+                        meshData = bpy.data.meshes.new("{}_{}_{}".format(bone.name,i,j))
+                        meshObj = bpy.data.objects.new("{}_mesh".format(meshData.name), meshData)
+                        scene.collection.objects.link(meshObj)
+                        
+                        # We'll use bmesh to define the mesh
+                        bm = bmesh.new()
+                        
+                        # Defining vertices and normals
+                        vert1 = bm.verts.new(polygon[0]["vertex"])
+                        vert1.normal = Vector(polygon[0]["normal"])
+                        vert2 = bm.verts.new(polygon[1]["vertex"])
+                        vert2.normal = Vector(polygon[1]["normal"])
+                        vert3 = bm.verts.new(polygon[2]["vertex"])
+                        vert3.normal = Vector(polygon[2]["normal"])
+                        
+                        # Mandatory functions after inserting vertices
+                        bm.verts.index_update()
+                        bm.verts.ensure_lookup_table()
 
-                    # Definining faces for the polygon
-                    bm.faces.new((vert1, vert2, vert3))
-                    bm.faces.index_update()
-                    bm.faces.ensure_lookup_table()
+                        # Definining faces for the polygon
+                        bm.faces.new((vert1, vert2, vert3))
+                        bm.faces.index_update()
+                        bm.faces.ensure_lookup_table()
 
-                    # Putting information from bmesh to mesh
-                    bm.to_mesh(meshData)
-                    bm.free()
+                        # Putting information from bmesh to mesh
+                        bm.to_mesh(meshData)
+                        bm.free()
 
-                    # Storing the mesh object to link it later to the corresponding bone
-                    if bone.name not in meshes:
-                        meshes[bone.name] = [meshObj]
-                    else:
-                        meshes[bone.name].append(meshObj)
+                        # Storing the mesh object to link it later to the corresponding bone
+                        if bone.name not in meshes:
+                            meshes[bone.name] = [meshObj]
+                        else:
+                            meshes[bone.name].append(meshObj)
 
         # Adding armature to the scene
         armatureData = bpy.data.armatures.new(name=model["skeleton"].name+"_root") # The Armature will represent the root bone for transformation purposes
@@ -1056,6 +1058,7 @@ def importLgp(context, filepath):
                 curBone.parent = editBones[parentName]
                 curBone.use_connect = True
             # Linking meshes to the corresponding bone
+            bpy.ops.object.mode_set(mode="OBJECT") # Used to make sure bone exist before linking meshes to it
             if bone.name in meshes:
                 for mesh in meshes[bone.name]:
                     mesh.parent = armatureObj
@@ -1064,6 +1067,7 @@ def importLgp(context, filepath):
                     constraint = mesh.constraints.new('COPY_TRANSFORMS')
                     constraint.target = armatureObj
                     constraint.subtarget = bone.name
+            bpy.ops.object.mode_set(mode="EDIT")
 
         viewLayer.objects.active = armatureObj
         bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff
