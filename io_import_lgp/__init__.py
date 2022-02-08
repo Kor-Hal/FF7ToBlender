@@ -673,7 +673,6 @@ class HRCSkeleton:
                 length = float(hrcLines[hrcRownum + 2])
                 rsd = hrcLines[hrcRownum + 3].split()
                 pFileList = []
-                texList = []
                 if int(rsd[0]): # If there's at least one RSD file
                     rsdFiles = [i.lower() + ".rsd" for i in rsd[1:]] # Get list of RSD files
                     for rsdFile in rsdFiles:
@@ -686,19 +685,22 @@ class HRCSkeleton:
 
                         # The .P file can be deduced from either PLY, GRP or MAT section
                         # I chose PLY because it's the first one
-                        pFile = [i.lower() for i in rsdLines if i.startswith("PLY=")][0].split("=")[1]
-                        pFile = os.path.splitext(pFile)[0] + ".p"
-                        pFile = self.PFile(charLGPFile.getFileContent(pFile))
-                        pFileList.append(pFile)
+                        pFileName = [i.lower() for i in rsdLines if i.startswith("PLY=")][0].split("=")[1]
+                        pFileName = os.path.splitext(pFileName)[0] + ".p"
 
                         # The NTEX section gives us the number of texture files
                         nbTex = int([i for i in rsdLines if i.startswith("NTEX=")][0][5:])
                         if nbTex > 0:
                             # We use list comprehension to extract TEX files' names
                             texList = [i[i.find("=") + 1:i.find(".")].lower() + ".tex" for i in rsdLines if i.startswith("TEX[")]
+                        else:
+                            texList = []
+
+                        pFile = self.PFile(charLGPFile.getFileContent(pFileName), texList)
+                        pFileList.append(pFile)
             
                 if name != "" and parent != "" and length != 0.0:
-                    bone = self.HRCBone(name, parent, length, pFileList, texList)
+                    bone = self.HRCBone(name, parent, length, pFileList)
                     self.bones.append(bone)
             
                 newBone = False
@@ -738,12 +740,11 @@ class HRCSkeleton:
         self.__bones = bones
         
     class HRCBone:
-        def __init__(self, name, parent, length, pFiles, texFiles):
+        def __init__(self, name, parent, length, pFiles):
             self.name = name
             self.parent = parent
             self.length = length
             self.pFiles = pFiles
-            self.texFiles = texFiles
             
         @property
         def name(self):
@@ -777,16 +778,8 @@ class HRCSkeleton:
         def pFiles(self, pFiles):
             self.__pFiles = pFiles
 
-        @property
-        def texFiles(self):
-            return self.__texFiles
-
-        @texFiles.setter
-        def texFiles(self, texFiles):
-            self.__texFiles = texFiles
-
     class PFile:
-        def __init__(self, data):
+        def __init__(self, data, textureFiles):
             _, vertexType, nbVertices, nbNormals, nbUnknown1, nbTexCoords, nbVertexColors, nbEdges, nbPolys, nbUnknown2, nbUnknown3, nbHundreds, nbGroups, nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
             offset = 128 # Header is 128 bytes long
             
@@ -837,7 +830,6 @@ class HRCSkeleton:
             # Last section is Normal index table, unused
 
             self.polygonGroups = []
-
             for group in groups:
                 polys = []
                 gr_polygons = polygons[group["polygonStartIndex"]:group["polygonStartIndex"] + group["nbPolygons"]] # Selecting group's polygons
@@ -854,7 +846,10 @@ class HRCSkeleton:
 
                     polys.append((vert1, vert2, vert3))
 
-                self.polygonGroups.append(polys)
+                if group["areTexturesUsed"] == 1: # There's a texture associated with this group
+                    self.polygonGroups.append({ "polygons": polys, "textureFile": textureFiles[group["textureNumber"]] })
+                else: # Polygons with no texture associated
+                    self.polygonGroups.append({ "polygons": polys, "textureFile": None })
 
         @property
         def polygonGroups(self):
@@ -951,7 +946,7 @@ def importLgp(context, filepath):
         for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
             skeletonFile = model.skeletonFile.lower() # Getting the skeleton file's name
             # TODO : Remove this if, debug purpose
-            if not skeletonFile.startswith("a"):
+            if skeletonFile != "asjc.hrc":
                 continue
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
@@ -1004,7 +999,7 @@ def importLgp(context, filepath):
                 continue
             for pFile in bone.pFiles:
                 for i, polygonGroup in enumerate(pFile.polygonGroups):
-                    for j, polygon in enumerate(polygonGroup):
+                    for j, polygon in enumerate(polygonGroup["polygons"]):
                         # Creating a mesh for the current polygon and linking it to the current scene
                         meshData = bpy.data.meshes.new("{}_{}_{}".format(bone.name,i,j))
                         meshObj = bpy.data.objects.new("{}_mesh".format(meshData.name), meshData)
