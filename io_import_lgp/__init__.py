@@ -14,7 +14,7 @@ bl_info = {
 # Imports
 
 import bmesh, bpy, math, os, struct
-from mathutils import Matrix, Quaternion, Vector
+from mathutils import Quaternion, Vector
 
 # Constants
 
@@ -22,390 +22,390 @@ from mathutils import Matrix, Quaternion, Vector
 # https://github.com/picklejar76/kujata/blob/master/friendly-names-db/skeleton-friendly-names.json
 
 SKELETONS_NAMES = {
-    "aaaa": "Cloud",
-    "aagb": "Tifa",
-    "abda": "Cid",
-    "abjb": "Yuffie",
-    "acgd": "Barret",
-    "adda": "Red XIII",
-    "aebc": "Cait Sith",
-    "aehd": "Vincent",
-    "afec": "Bugenhagen",
-    "afie": "Cloud Parachute",
-    "aggb": "Tifa Parachute",
-    "ahdf": "Yuffie Parachute",
-    "aiba": "Barret Parachute",
-    "aihb": "Cid Parachute",
-    "ajif": "Skinny Highwind Crewman",
-    "akee": "Burly Highwind Crewman",
-    "alad": "Rufus",
-    "algd": "Heidegger",
-    "amcc": "Scarlet",
-    "anbd": "Hojo",
-    "anic": "Rude",
-    "aodd": "Reno",
-    "aqgc": "Chocobo",
-    "arfd": "Sleeping Old Man",
-    "asbf": "Tanned Midgar Man",
-    "asjc": "Chocobo Sage",
-    "ateb": "Command Materia",
-    "atfe": "Lucretia in Cave",
-    "auda": "Handgun",
-    "aude": "Independent Materia",
-    "auff": "Aeris",
-    "avfe": "Save Point",
-    "avhe": "Traditional Chest",
-    "awae": "Green Chest",
-    "awbe": "Summon Materia",
-    "awcb": "Hojo Assistant",
-    "awhf": "President Shinra",
-    "axdc": "Jessie",
-    "axja": "Tifa Corneo",
-    "ayfb": "Barret Sailor",
-    "azbb": "Aeris Corneo",
-    "azhe": "Train Guard",
-    "badd": "Honey Bee Girl",
-    "bbab": "Sephiroth w/Sword",
-    "bbge": "Costa Bar Girl",
-    "bccf": "Ancient Temple Guard",
-    "bcgd": "Shinra Sailor",
-    "bdcd": "Mr. Dolphin",
-    "bdga": "Cat",
-    "beec": "Mideel Dog (Grey)",
-    "bfca": "Johnny's Dad",
-    "bfhe": "Sector 7 Shop Owner",
-    "bgdc": "Shera",
-    "bgjc": "Sephiroth w/Jenny Head",
-    "bhff": "Cloud w/Buster Sword",
-    "bidb": "Tifa Cowgirl",
-    "bijd": "Vincent Turk",
-    "bjfb": "Cloud's Mom",
-    "bkbf": "Priscilla",
-    "bkhd": "Sephiroth",
-    "blde": "Tifa's Father's Friend",
-    "bljc": "Mideel Doctor",
-    "bmee": "Little Girl",
-    "bnaf": "ZANGAN",
-    "bngd": "Dyne w/Gun",
-    "bocc": "Grey Peasant",
-    "bohe": "Icicle Inn Woman/Mother",
-    "bpdc": "Muscle-Man (Blonde)",
-    "bpjd": "Reeve",
-    "bqfb": "Blue Villager",
-    "braf": "Cloud's House Occupant",
-    "brgd": "Motorcycle...",
-    "brib": "Cloud Motorcycle (Jesus)",
-    "bsfc": "Female Villager",
-    "btec": "Female Nurse",
-    "buac": "Young Tifa",
-    "buge": "Young Cloud",
-    "bvda": "Tifa's Father",
-    "bwab": "Shinra Soldier",
-    "bwfd": "Biggs",
-    "bxbe": "Wedge",
-    "bxjb": "Train Door",
-    "byba": "Slab",
-    "bybf": "Panel w/Lights",
-    "bycd": "Catwalk Grating",
-    "bydd": "Gold Chest",
-    "bygf": "Blue Potion",
-    "byib": "Magic Materia",
-    "bzda": "AIR BUSTER!",
-    "bzhf": "Shinra Beta Copter",
-    "cade": "Catwalk Grating",
-    "cahc": "Aeris w/Flower Basket",
-    "cbfe": "Red hair hooker",
-    "ccbc": "Red Punk",
-    "ccha": "Light Blue Potion",
-    "cdja": "Shinra Manager",
-    "cefd": "Train Drunk",
-    "cfbb": "Phoenix Down Hobo",
-    "cfha": "Honey Bee Guard/Punk",
-    "cgda": "Sector 7 Kid",
-    "cgif": "Red Cap Tifa friend",
-    "ched": "Chole",
-    "ciac": "Hi-Potion Dealer",
-    "cige": "Biggs Train Disguise",
-    "cjcc": "Wedge Train Disguise",
-    "cjif": "Johnny",
-    "ckfc": "Costa Guy",
-    "clbb": "Costa Surf Bro",
-    "clgd": "Tall Cloud Field",
-    "cmde": "Tall Jessie Field",
-    "cmif": "Tanned Guy",
-    "cned": "Item Bag",
-    "cnfb": "Moving Train (Train Graveyard)",
-    "cnhf": "Train Carriage (Train Graveyard)",
-    "coad": "Housewife Purple",
-    "cogb": "Elmyra",
-    "cpca": "Child, Red dungarees",
-    "cpjf": "Ifalna",
-    "cqga": "Kid Aeris",
-    "crca": "Tifa's Father's Friend",
-    "crid": "Tracksuit Man",
-    "csed": "Cosmo Miner Repairman csga",
-    "ctbe": "Magic Materia",
-    "ctcc": "Gold Saucer F. Attendant",
-    "ctib": "Hall; Kid Opponent",
-    "cufc": "Hall; Black Flexer",
-    "cvba": "Hall; Burly Flexer",
-    "cvge": "Hall; Punk Flexer",
-    "cwed": "Sector 7 Busy-body",
-    "cyae": "Marlene",
-    "cyif": "Mr. Duffi-look alike",
-    "czed": "Avalanche Hideout: Pinball Machine",
-    "czgb": "Yellow Rectangle",
-    "czgf": "Flowers",
-    "dabf": "Green Materia",
-    "dafb": "Cologne Lady",
-    "dbec": "Tseng",
-    "dcce": "Pillar Collapse Hook-Swing",
-    "dcfb": "Bright Green Potion",
-    "dcic": "Tanned Guy NPC",
-    "ddha": "This guy are sick",
-    "deda": "Clothes Shop Son",
-    "deie": "Dog (Brown)",
-    "dfgd": "Tiara Guy",
-    "dgcd": "Nibel Kids Boy",
-    "dhaf": "Reno (No Face)",
-    "dhge": "Barrel",
-    "dhhf": "Ladder",
-    "dhid": "Rocky Caltrops",
-    "diff": "Kid Aeris, Brown Dress",
-    "djfa": "Claw in Golden Saucer Claw-Game",
-    "djfe": "Girder",
-    "djid": "Chocobo Carriage",
-    "dkie": "Metal Flooring (4)",
-    "dkjd": "Metal Flooring (7)",
-    "dlfb": "Cloud Corneo",
-    "dmcb": "Old tanned guy",
-    "dmia": "Miner/Jon-Tron",
-    "dndf": "Black Muscle-man",
-    "dnje": "Mukki",
-    "doga": "Battle Model-Like Hand",
-    "doib": "Female Trenchcoat NPC doje",
-    "dpef": "Chef in Wall Market",
-    "dqae": "Accessory Maid",
-    "dqgd": "Diner at Wall Market",
-    "drcc": "Rocket Technician",
-    "dria": "Meal A TEX Wall Market",
-    "drif": "Meal B TEX Wall Market",
-    "drje": "Meal C TEX Wall Market",
-    "dsbc": "Kalm Chef",
-    "dsgf": "Junon Old Inn Lady",
-    "dtce": "High-Collar NPC",
-    "dtic": "Propellor (Green)",
-    "dtjb": "Honey Bee Manager",
-    "dufa": "Scotch",
-    "dvbe": "Kotch",
-    "dvhf": "Don Corneo",
-    "dxbd": "Shinra Soldier Rifle",
-    "dxje": "Daughter Honey Bee Room",
-    "dyfd": "King Shinra",
-    "dzbb": "Knight",
-    "dzgf": "Shinra Manager Alt",
-    "eaga": "Broken Propellor, Climb to Shinra Tower",
-    "eagf": "Swinging Beam, Climb to Shinra Tower",
-    "eaid": "Shinra Alpha Copter",
-    "ebca": "Beam of light",
-    "ebec": "Choco Billy",
-    "ebjf": "Door/Panel Shinra Tower?",
-    "ecae": "Ditto",
-    "ecbf": "Turqouise Dress NPC",
-    "echd": "Shinra Tower Glass Elevator",
-    "ecib": "Shinra Secretary",
-    "edea": "Woman fl60",
-    "edjd": "Old Man",
-    "eefb": "Construct, maybe a paddock",
-    "eegc": "Palmer",
-    "effb": "Grate Toilet 66th Floor",
-    "eghe": "Masamune (President Shinra Dead)",
-    "ehbe": "Tracksuit NPC",
-    "ehhc": "Black-Cloaked Man",
-    "eiac": "Red Woman NPC",
-    "eihd": "Cloud, Helmet in Hands, on Truck",
-    "ejdc": "Zack w/sword",
-    "ekbf": "MP Cloud",
-    "ekjb": "Young Hojo",
-    "elgc": "Young Gast",
-    "emdf": "Corel Miner",
-    "enab": "Young Cloud Black Shirt",
-    "eoac": "Key",
-    "eoce": "Vincent Coffin lid",
-    "eoea": "Sephiroth with book",
-    "epfb": "Materia Keeper",
-    "eqib": "Cowgirl Tifa w/Masamune",
-    "erha": "Sephy w/Jenny Head",
-    "eseb": "MP Cloud w/Sword",
-    "etfe": "Blue Child, No Face",
-    "euaf": "Red Child, No Face",
-    "euhb": "Crazy old guy!",
-    "evfe": "Elena",
-    "ewbd": "Corel Burly Miner",
-    "ewje": "Corel Miner Wife",
-    "exga": "Small Condor",
-    "eyie": "Rufus' Car",
-    "ezcc": "Patchwork Cat",
-    "faae": "Cyan Potion",
-    "fabb": "Red Potion",
-    "fabe": "Green Potion",
-    "facc": "Black Propellor/Untex",
-    "fadc": "Yellow Potion",
-    "fbba": "Journalist Male",
-    "fbge": "Cait Sith Journalist",
-    "fcaf": "Journalist Female",
-    "fcgd": "Cameraman",
-    "feea": "Yuffie Journalist",
-    "ffec": "Small Green Fish",
-    "ffha": "Yellow/Red Shoal",
-    "fgae": "Shark",
-    "fgec": "Metal Door",
-    "fgfb": "Crane Claw",
-    "fghf": "Huge Materia Capsule Underwater Reactor",
-    "fhaa": "Carry Armour",
-    "fhic": "Door/Panel",
-    "fhjb": "Door/Panel 1",
-    "fiba": "Bottomswell",
-    "fjaf": "Red Light",
-    "fjbd": "Lung Meter CPR",
-    "fjcf": "Red XIII Soldier Disguise",
-    "fkca": "Jenova Tentacle",
-    "fkdf": "Hojo Groupie lying down",
-    "flac": "Costa Entrance Girl",
-    "flge": "Costa Beach girl",
-    "fmcc": "Snorkel Kid",
-    "fmib": "Swimsuit kid",
-    "fndf": "Football",
-    "fnef": "Sector 7 Wep Shop Shooter",
-    "fobe": "Layabout",
-    "fpcb": "Catastrophe Corel girl",
-    "fqab": "Long Train, Corel Chase",
-    "fqbb": "Cid's Train, Corel Chase",
-    "fqcb": "Barret, Corel Flashback",
-    "fqjb": "Dyne, Corel Flashback frae",
-    "frgd": "Corel Mayor",
-    "fsdd": "Pink Potion",
-    "fsge": "Corel Miner, slumped",
-    "ftcf": "Corel Miner",
-    "ftic": "Corel Miner, female",
-    "fufe": "Corel Miner/Punk",
-    "fved": "Mr. Coates",
-    "fwae": "Ester",
-    "fwgf": "Dyne's Pendant",
-    "fxjc": "Gold Saucer Guard",
-    "fzcc": "EDK",
-    "gabe": "Play Wizard",
-    "gajc": "Dio",
-    "gbia": "G.Saucer Bird-Suit",
-    "gcbd": "Male Attendant",
-    "gchc": "G.Saucer Coaster",
-    "gcjc": "Gondola Texture",
-    "gdic": "Bat",
-    "gebb": "Hotel Greeter/Lurch",
-    "gehd": "Hotel Desk/Igor",
-    "gfdf": "Mr. Hangman",
-    "ggef": "Elixir Cabinet Door-right",
-    "ggfe": "Ditto, Left door",
-    "gghe": "Hand Pointer Tex",
-    "ggid": "Purple shaft of light",
-    "ggjc": "Yellow shaft of light (Battle Square)",
-    "ghad": "Battle Square, f.kicker",
-    "ghgf": "G.Saucer Capture Device",
-    "giha": "ZANGIEF!",
-    "gjab": "E.HONDA!",
-    "gjcf": "Basketball",
-    "gjeb": "Speed Bike, Field",
-    "gjha": "3D Battler, Rookie",
-    "gkcf": "3D Battler, Luchadore gkec",
-    "gkid": "3D Battler, Afro Thunder",
-    "gleb": "3D Battler, Super Hero",
-    "gljd": "Mog",
-    "gmha": "Pink Mog",
-    "gnca": "Bright Mog",
-    "gngb": "Yellow Mog",
-    "goac": "Pink Mog",
-    "gofd": "Choco Square Teller",
-    "gpcd": "Joe",
-    "gpjb": "Blue Jockey",
-    "gqfe": "Green Jockey",
-    "grcc": "Choco Elevator (From Corel Prison)",
-    "grga": "Cosmo Canyon Greeter",
-    "gsbe": "Cosmo Kid",
-    "gshc": "Cosmo Propellor",
-    "gsje": "Cosmo Mother",
-    "gtfc": "Cosmo Elderly Lady",
-    "guba": "Cosmo Kid Boy",
-    "guhc": "Cosmo Door",
-    "guib": "Cosmo Door",
-    "gujc": "Glacier Map",
-    "gvae": "Radar Dish",
-    "gvbc": "Weather Vane",
-    "gvce": "Yellow Huge Materia",
-    "gvdc": "Green Huge Materia",
-    "gvea": "Red Huge Materia",
-    "gvee": "Blue Huge Materia",
-    "gwaa": "Cosmo Observatory Planet/Two Moons",
-    "gwcc": "Bugenhagen Lying down (Green orb missing)",
-    "gwib": "Green orb",
-    "gwif": "Rocket Town Citizen",
-    "gxef": "Rocket Town Bored Citizen gxgc",
-    "gydc": "Rocket Town Citizen",
-    "gzad": "Young Cid",
-    "gzgb": "Door Base; Rocket",
-    "gzha": "Door Base; Rocket",
-    "gzhf": "Rocket Technician",
-    "hagb": "Rocket Huge Materia Capsule",
-    "hcef": "Debris, pins Cid",
-    "hdbb": "Wutai Citizen male",
-    "hdgf": "Wutai Citizen, Staniv hdic",
-    "hecd": "Wutai Citizen, Chekhov",
-    "heib": "Wutai Citizen female",
-    "hffb": "Wutai Citizen, Gorki",
-    "hgaf": "Wutai Citizen, Shake",
-    "hgia": "Yuffie House Cage",
-    "hgjd": "Godo",
-    "hhge": "Wutai Door",
-    "hhhd": "Wutai Door",
-    "hhic": "Wutai Panel",
-    "hhjf": "Corneo Ninja",
-    "hjdc": "Component, Gong-mechanism possibly",
-    "hjga": "Ancient Temple Chest",
-    "hjhf": "Rolling Stone",
-    "hjie": "Clock, Minute/Sec Hand",
-    "hjjd": "Clock, Minute/sec Hand",
-    "hkac": "Clock, Hour Hand",
-    "hkbb": "Clock core, base",
-    "hkea": "Clock Core, mouth",
-    "hkhb": "Temple Puzzle",
-    "hkjc": "Demon Wall",
-    "hlfc": "Green Digger",
-    "hmbe": "Purple Digger",
-    "hmif": "Ancient Forest, Fly",
-    "hnaf": "Ancient FOrest, Frog",
-    "hneb": "Ancient Forest, Tongue Feeler",
-    "hnif": "Ancient Forest, Bee Hive",
-    "hobd": "Ancient Key",
-    "hpce": "Icicle Kid Girl",
-    "hpib": "Icicle Man",
-    "hqgc": "Blue Panel",
-    "hqhc": "Snowboard",
-    "hrae": "Red Flag",
-    "hrce": "Blue Chest",
-    "hree": "Tumbling Rock",
-    "hrff": "Ice Stalagmite",
-    "hrha": "Ice Stalagmite",
-    "hrhe": "Ice Stalagmite",
-    "hseb": "Ice Stalagmite",
-    "hsjd": "Ultimate Weapon",
-    "htje": "Handicapable Cloud",
-    "hvcf": "Train Cars, Corel Chase",
-    "hvjf": "Red XIII Para Freefall",
-    "hwib": "Parachute open texture",
-    "hxbc": "Proud Clod",
-    "hyfd": "Jenova Synthesis",
-    "iajd": "Yellow Projectile (Diamond Wep Attacks)",
-    "ibad": "Zack, no sword",
-    "ibgd": "Zack, w/sword"
+    "aaaa":"Cloud",
+    "aagb":"Tifa",
+    "abda":"Cid",
+    "abjb":"Yuffie",
+    "acgd":"Barret",
+    "adda":"Red XIII",
+    "aebc":"Cait Sith",
+    "aehd":"Vincent",
+    "afec":"Bugenhagen",
+    "afie":"Cloud Parachute",
+    "aggb":"Tifa Parachute",
+    "ahdf":"Yuffie Parachute",
+    "aiba":"Barret Parachute",
+    "aihb":"Cid Parachute",
+    "ajif":"Skinny Highwind Crewman",
+    "akee":"Burly Highwind Crewman",
+    "alad":"Rufus",
+    "algd":"Heidegger",
+    "amcc":"Scarlet",
+    "anbd":"Hojo",
+    "anic":"Rude",
+    "aodd":"Reno",
+    "aqgc":"Chocobo",
+    "arfd":"Sleeping Old Man",
+    "asbf":"Tanned Midgar Man",
+    "asjc":"Chocobo Sage",
+    "ateb":"Command Materia",
+    "atfe":"Lucretia in Cave",
+    "auda":"Handgun",
+    "aude":"Independent Materia",
+    "auff":"Aeris",
+    "avfe":"Save Point",
+    "avhe":"Traditional Chest",
+    "awae":"Green Chest",
+    "awbe":"Summon Materia",
+    "awcb":"Hojo Assistant",
+    "awhf":"President Shinra",
+    "axdc":"Jessie",
+    "axja":"Tifa Corneo",
+    "ayfb":"Barret Sailor",
+    "azbb":"Aeris Corneo",
+    "azhe":"Train Guard",
+    "badd":"Honey Bee Girl",
+    "bbab":"Sephiroth w/Sword",
+    "bbge":"Costa Bar Girl",
+    "bccf":"Ancient Temple Guard",
+    "bcgd":"Shinra Sailor",
+    "bdcd":"Mr. Dolphin",
+    "bdga":"Cat",
+    "beec":"Mideel Dog (Grey)",
+    "bfca":"Johnny's Dad",
+    "bfhe":"Sector 7 Shop Owner",
+    "bgdc":"Shera",
+    "bgjc":"Sephiroth w/Jenny Head",
+    "bhff":"Cloud w/Buster Sword",
+    "bidb":"Tifa Cowgirl",
+    "bijd":"Vincent Turk",
+    "bjfb":"Cloud's Mom",
+    "bkbf":"Priscilla",
+    "bkhd":"Sephiroth",
+    "blde":"Tifa's Father's Friend",
+    "bljc":"Mideel Doctor",
+    "bmee":"Little Girl",
+    "bnaf":"ZANGAN",
+    "bngd":"Dyne w/Gun",
+    "bocc":"Grey Peasant",
+    "bohe":"Icicle Inn Woman/Mother",
+    "bpdc":"Muscle-Man (Blonde)",
+    "bpjd":"Reeve",
+    "bqfb":"Blue Villager",
+    "braf":"Cloud's House Occupant",
+    "brgd":"Motorcycle...",
+    "brib":"Cloud Motorcycle (Jesus)",
+    "bsfc":"Female Villager",
+    "btec":"Female Nurse",
+    "buac":"Young Tifa",
+    "buge":"Young Cloud",
+    "bvda":"Tifa's Father",
+    "bwab":"Shinra Soldier",
+    "bwfd":"Biggs",
+    "bxbe":"Wedge",
+    "bxjb":"Train Door",
+    "byba":"Slab",
+    "bybf":"Panel w/Lights",
+    "bycd":"Catwalk Grating",
+    "bydd":"Gold Chest",
+    "bygf":"Blue Potion",
+    "byib":"Magic Materia",
+    "bzda":"AIR BUSTER!",
+    "bzhf":"Shinra Beta Copter",
+    "cade":"Catwalk Grating",
+    "cahc":"Aeris w/Flower Basket",
+    "cbfe":"Red hair hooker",
+    "ccbc":"Red Punk",
+    "ccha":"Light Blue Potion",
+    "cdja":"Shinra Manager",
+    "cefd":"Train Drunk",
+    "cfbb":"Phoenix Down Hobo",
+    "cfha":"Honey Bee Guard/Punk",
+    "cgda":"Sector 7 Kid",
+    "cgif":"Red Cap Tifa friend",
+    "ched":"Chole",
+    "ciac":"Hi-Potion Dealer",
+    "cige":"Biggs Train Disguise",
+    "cjcc":"Wedge Train Disguise",
+    "cjif":"Johnny",
+    "ckfc":"Costa Guy",
+    "clbb":"Costa Surf Bro",
+    "clgd":"Tall Cloud Field",
+    "cmde":"Tall Jessie Field",
+    "cmif":"Tanned Guy",
+    "cned":"Item Bag",
+    "cnfb":"Moving Train (Train Graveyard)",
+    "cnhf":"Train Carriage (Train Graveyard)",
+    "coad":"Housewife Purple",
+    "cogb":"Elmyra",
+    "cpca":"Child, Red dungarees",
+    "cpjf":"Ifalna",
+    "cqga":"Kid Aeris",
+    "crca":"Tifa's Father's Friend",
+    "crid":"Tracksuit Man",
+    "csed":"Cosmo Miner Repairman csga",
+    "ctbe":"Magic Materia",
+    "ctcc":"Gold Saucer F. Attendant",
+    "ctib":"Hall; Kid Opponent",
+    "cufc":"Hall; Black Flexer",
+    "cvba":"Hall; Burly Flexer",
+    "cvge":"Hall; Punk Flexer",
+    "cwed":"Sector 7 Busy-body",
+    "cyae":"Marlene",
+    "cyif":"Mr. Duffi-look alike",
+    "czed":"Avalanche Hideout: Pinball Machine",
+    "czgb":"Yellow Rectangle",
+    "czgf":"Flowers",
+    "dabf":"Green Materia",
+    "dafb":"Cologne Lady",
+    "dbec":"Tseng",
+    "dcce":"Pillar Collapse Hook-Swing",
+    "dcfb":"Bright Green Potion",
+    "dcic":"Tanned Guy NPC",
+    "ddha":"This guy are sick",
+    "deda":"Clothes Shop Son",
+    "deie":"Dog (Brown)",
+    "dfgd":"Tiara Guy",
+    "dgcd":"Nibel Kids Boy",
+    "dhaf":"Reno (No Face)",
+    "dhge":"Barrel",
+    "dhhf":"Ladder",
+    "dhid":"Rocky Caltrops",
+    "diff":"Kid Aeris, Brown Dress",
+    "djfa":"Claw in Golden Saucer Claw-Game",
+    "djfe":"Girder",
+    "djid":"Chocobo Carriage",
+    "dkie":"Metal Flooring (4)",
+    "dkjd":"Metal Flooring (7)",
+    "dlfb":"Cloud Corneo",
+    "dmcb":"Old tanned guy",
+    "dmia":"Miner/Jon-Tron",
+    "dndf":"Black Muscle-man",
+    "dnje":"Mukki",
+    "doga":"Battle Model-Like Hand",
+    "doib":"Female Trenchcoat NPC doje",
+    "dpef":"Chef in Wall Market",
+    "dqae":"Accessory Maid",
+    "dqgd":"Diner at Wall Market",
+    "drcc":"Rocket Technician",
+    "dria":"Meal A TEX Wall Market",
+    "drif":"Meal B TEX Wall Market",
+    "drje":"Meal C TEX Wall Market",
+    "dsbc":"Kalm Chef",
+    "dsgf":"Junon Old Inn Lady",
+    "dtce":"High-Collar NPC",
+    "dtic":"Propellor (Green)",
+    "dtjb":"Honey Bee Manager",
+    "dufa":"Scotch",
+    "dvbe":"Kotch",
+    "dvhf":"Don Corneo",
+    "dxbd":"Shinra Soldier Rifle",
+    "dxje":"Daughter Honey Bee Room",
+    "dyfd":"King Shinra",
+    "dzbb":"Knight",
+    "dzgf":"Shinra Manager Alt",
+    "eaga":"Broken Propellor, Climb to Shinra Tower",
+    "eagf":"Swinging Beam, Climb to Shinra Tower",
+    "eaid":"Shinra Alpha Copter",
+    "ebca":"Beam of light",
+    "ebec":"Choco Billy",
+    "ebjf":"Door/Panel Shinra Tower?",
+    "ecae":"Ditto",
+    "ecbf":"Turqouise Dress NPC",
+    "echd":"Shinra Tower Glass Elevator",
+    "ecib":"Shinra Secretary",
+    "edea":"Woman fl60",
+    "edjd":"Old Man",
+    "eefb":"Construct, maybe a paddock",
+    "eegc":"Palmer",
+    "effb":"Grate Toilet 66th Floor",
+    "eghe":"Masamune (President Shinra Dead)",
+    "ehbe":"Tracksuit NPC",
+    "ehhc":"Black-Cloaked Man",
+    "eiac":"Red Woman NPC",
+    "eihd":"Cloud, Helmet in Hands, on Truck",
+    "ejdc":"Zack w/sword",
+    "ekbf":"MP Cloud",
+    "ekjb":"Young Hojo",
+    "elgc":"Young Gast",
+    "emdf":"Corel Miner",
+    "enab":"Young Cloud Black Shirt",
+    "eoac":"Key",
+    "eoce":"Vincent Coffin lid",
+    "eoea":"Sephiroth with book",
+    "epfb":"Materia Keeper",
+    "eqib":"Cowgirl Tifa w/Masamune",
+    "erha":"Sephy w/Jenny Head",
+    "eseb":"MP Cloud w/Sword",
+    "etfe":"Blue Child, No Face",
+    "euaf":"Red Child, No Face",
+    "euhb":"Crazy old guy!",
+    "evfe":"Elena",
+    "ewbd":"Corel Burly Miner",
+    "ewje":"Corel Miner Wife",
+    "exga":"Small Condor",
+    "eyie":"Rufus' Car",
+    "ezcc":"Patchwork Cat",
+    "faae":"Cyan Potion",
+    "fabb":"Red Potion",
+    "fabe":"Green Potion",
+    "facc":"Black Propellor/Untex",
+    "fadc":"Yellow Potion",
+    "fbba":"Journalist Male",
+    "fbge":"Cait Sith Journalist",
+    "fcaf":"Journalist Female",
+    "fcgd":"Cameraman",
+    "feea":"Yuffie Journalist",
+    "ffec":"Small Green Fish",
+    "ffha":"Yellow/Red Shoal",
+    "fgae":"Shark",
+    "fgec":"Metal Door",
+    "fgfb":"Crane Claw",
+    "fghf":"Huge Materia Capsule Underwater Reactor",
+    "fhaa":"Carry Armour",
+    "fhic":"Door/Panel",
+    "fhjb":"Door/Panel 1",
+    "fiba":"Bottomswell",
+    "fjaf":"Red Light",
+    "fjbd":"Lung Meter CPR",
+    "fjcf":"Red XIII Soldier Disguise",
+    "fkca":"Jenova Tentacle",
+    "fkdf":"Hojo Groupie lying down",
+    "flac":"Costa Entrance Girl",
+    "flge":"Costa Beach girl",
+    "fmcc":"Snorkel Kid",
+    "fmib":"Swimsuit kid",
+    "fndf":"Football",
+    "fnef":"Sector 7 Wep Shop Shooter",
+    "fobe":"Layabout",
+    "fpcb":"Catastrophe Corel girl",
+    "fqab":"Long Train, Corel Chase",
+    "fqbb":"Cid's Train, Corel Chase",
+    "fqcb":"Barret, Corel Flashback",
+    "fqjb":"Dyne, Corel Flashback frae",
+    "frgd":"Corel Mayor",
+    "fsdd":"Pink Potion",
+    "fsge":"Corel Miner, slumped",
+    "ftcf":"Corel Miner",
+    "ftic":"Corel Miner, female",
+    "fufe":"Corel Miner/Punk",
+    "fved":"Mr. Coates",
+    "fwae":"Ester",
+    "fwgf":"Dyne's Pendant",
+    "fxjc":"Gold Saucer Guard",
+    "fzcc":"EDK",
+    "gabe":"Play Wizard",
+    "gajc":"Dio",
+    "gbia":"G.Saucer Bird-Suit",
+    "gcbd":"Male Attendant",
+    "gchc":"G.Saucer Coaster",
+    "gcjc":"Gondola Texture",
+    "gdic":"Bat",
+    "gebb":"Hotel Greeter/Lurch",
+    "gehd":"Hotel Desk/Igor",
+    "gfdf":"Mr. Hangman",
+    "ggef":"Elixir Cabinet Door-right",
+    "ggfe":"Ditto, Left door",
+    "gghe":"Hand Pointer Tex",
+    "ggid":"Purple shaft of light",
+    "ggjc":"Yellow shaft of light (Battle Square)",
+    "ghad":"Battle Square, f.kicker",
+    "ghgf":"G.Saucer Capture Device",
+    "giha":"ZANGIEF!",
+    "gjab":"E.HONDA!",
+    "gjcf":"Basketball",
+    "gjeb":"Speed Bike, Field",
+    "gjha":"3D Battler, Rookie",
+    "gkcf":"3D Battler, Luchadore gkec",
+    "gkid":"3D Battler, Afro Thunder",
+    "gleb":"3D Battler, Super Hero",
+    "gljd":"Mog",
+    "gmha":"Pink Mog",
+    "gnca":"Bright Mog",
+    "gngb":"Yellow Mog",
+    "goac":"Pink Mog",
+    "gofd":"Choco Square Teller",
+    "gpcd":"Joe",
+    "gpjb":"Blue Jockey",
+    "gqfe":"Green Jockey",
+    "grcc":"Choco Elevator (From Corel Prison)",
+    "grga":"Cosmo Canyon Greeter",
+    "gsbe":"Cosmo Kid",
+    "gshc":"Cosmo Propellor",
+    "gsje":"Cosmo Mother",
+    "gtfc":"Cosmo Elderly Lady",
+    "guba":"Cosmo Kid Boy",
+    "guhc":"Cosmo Door",
+    "guib":"Cosmo Door",
+    "gujc":"Glacier Map",
+    "gvae":"Radar Dish",
+    "gvbc":"Weather Vane",
+    "gvce":"Yellow Huge Materia",
+    "gvdc":"Green Huge Materia",
+    "gvea":"Red Huge Materia",
+    "gvee":"Blue Huge Materia",
+    "gwaa":"Cosmo Observatory Planet/Two Moons",
+    "gwcc":"Bugenhagen Lying down (Green orb missing)",
+    "gwib":"Green orb",
+    "gwif":"Rocket Town Citizen",
+    "gxef":"Rocket Town Bored Citizen gxgc",
+    "gydc":"Rocket Town Citizen",
+    "gzad":"Young Cid",
+    "gzgb":"Door Base; Rocket",
+    "gzha":"Door Base; Rocket",
+    "gzhf":"Rocket Technician",
+    "hagb":"Rocket Huge Materia Capsule",
+    "hcef":"Debris, pins Cid",
+    "hdbb":"Wutai Citizen male",
+    "hdgf":"Wutai Citizen, Staniv hdic",
+    "hecd":"Wutai Citizen, Chekhov",
+    "heib":"Wutai Citizen female",
+    "hffb":"Wutai Citizen, Gorki",
+    "hgaf":"Wutai Citizen, Shake",
+    "hgia":"Yuffie House Cage",
+    "hgjd":"Godo",
+    "hhge":"Wutai Door",
+    "hhhd":"Wutai Door",
+    "hhic":"Wutai Panel",
+    "hhjf":"Corneo Ninja",
+    "hjdc":"Component, Gong-mechanism possibly",
+    "hjga":"Ancient Temple Chest",
+    "hjhf":"Rolling Stone",
+    "hjie":"Clock, Minute/Sec Hand",
+    "hjjd":"Clock, Minute/sec Hand",
+    "hkac":"Clock, Hour Hand",
+    "hkbb":"Clock core, base",
+    "hkea":"Clock Core, mouth",
+    "hkhb":"Temple Puzzle",
+    "hkjc":"Demon Wall",
+    "hlfc":"Green Digger",
+    "hmbe":"Purple Digger",
+    "hmif":"Ancient Forest, Fly",
+    "hnaf":"Ancient FOrest, Frog",
+    "hneb":"Ancient Forest, Tongue Feeler",
+    "hnif":"Ancient Forest, Bee Hive",
+    "hobd":"Ancient Key",
+    "hpce":"Icicle Kid Girl",
+    "hpib":"Icicle Man",
+    "hqgc":"Blue Panel",
+    "hqhc":"Snowboard",
+    "hrae":"Red Flag",
+    "hrce":"Blue Chest",
+    "hree":"Tumbling Rock",
+    "hrff":"Ice Stalagmite",
+    "hrha":"Ice Stalagmite",
+    "hrhe":"Ice Stalagmite",
+    "hseb":"Ice Stalagmite",
+    "hsjd":"Ultimate Weapon",
+    "htje":"Handicapable Cloud",
+    "hvcf":"Train Cars, Corel Chase",
+    "hvjf":"Red XIII Para Freefall",
+    "hwib":"Parachute open texture",
+    "hxbc":"Proud Clod",
+    "hyfd":"Jenova Synthesis",
+    "iajd":"Yellow Projectile (Diamond Wep Attacks)",
+    "ibad":"Zack, no sword",
+    "ibgd":"Zack, w/sword"
 }
 
 # Classes
@@ -696,7 +696,7 @@ class HRCSkeleton:
                         else:
                             texList = []
 
-                        pFile = self.PFile(charLGPFile.getFileContent(pFileName), texList)
+                        pFile = self.PFile(pFileName, charLGPFile.getFileContent(pFileName), texList)
                         pFileList.append(pFile)
             
                 if name != "" and parent != "" and length != 0.0:
@@ -779,54 +779,60 @@ class HRCSkeleton:
             self.__pFiles = pFiles
 
     class PFile:
-        def __init__(self, data, textureFiles):
-            _, vertexType, nbVertices, nbNormals, nbUnknown1, nbTexCoords, nbVertexColors, nbEdges, nbPolys, nbUnknown2, nbUnknown3, nbHundreds, nbGroups, nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
+        def __init__(self, filename, data, textureFiles):
+            self.filename = filename
+
+            _, _, nbVertices, nbNormals, nbUnknown1, nbTexCoords, nbVertexColors, nbEdges, nbPolys, nbUnknown2, nbUnknown3, nbHundreds, nbGroups, nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
             offset = 128 # Header is 128 bytes long
             
             vertices_list = list(struct.unpack("<{}f".format(3 * nbVertices), data[offset:offset + 12 * nbVertices]))
-            offset += 12 * nbVertices
             it = iter(vertices_list)
             vertices = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
             vertices = [(x, -z, y) for x, y, z in vertices] # Converting coordinates between FF7's referential and Blender's
+            offset += 12 * nbVertices
             
             normals_list = list(struct.unpack("<{}f".format(3 * nbNormals), data[offset:offset + 12 * nbNormals]))
-            offset += 12 * nbNormals + 12 * nbUnknown1 # Avoiding unknown block
             it = iter(normals_list)
             normals = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
             normals = [(x, -z, y) for x, y, z in normals] # Converting coordinates between FF7's referential and Blender's
+            offset += 12 * nbNormals + 12 * nbUnknown1 # Avoiding unknown block
 
             texCoords_list = list(struct.unpack("<{}f".format(2 * nbTexCoords), data[offset:offset + 8 * nbTexCoords]))
-            offset += 8 * nbTexCoords
             it = iter(texCoords_list)
             texCoords = list(zip(it, it)) # Tex coords are tuples of X and Y coordinates
+            offset += 8 * nbTexCoords
             
             vertexColors_list = list(struct.unpack("<{}c".format(4 * nbVertexColors), data[offset:offset + 4 * nbVertexColors]))
-            offset += 4 * nbVertexColors
             it = iter(vertexColors_list)
-            vertexColors = [{"b": int.from_bytes(b, byteorder="little"), "g": int.from_bytes(g, byteorder="little"), "r": int.from_bytes(r, byteorder="little"), "a": int.from_bytes(a, byteorder="little")} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
+            vertexColors = [(int.from_bytes(r, byteorder="little")/255, int.from_bytes(g, byteorder="little")/255, int.from_bytes(b, byteorder="little")/255, int.from_bytes(a, byteorder="little")/255) for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
+            offset += 4 * nbVertexColors
             
-            polygonColors_list = list(struct.unpack("<{}c".format(4 * nbPolys), data[offset:offset + 4 * nbPolys]))
+            # Uncomment this section if needed
+            # polygonColors_list = list(struct.unpack("<{}c".format(4 * nbPolys), data[offset:offset + 4 * nbPolys]))
+            # it = iter(polygonColors_list)
+            # polygonColors = [{"b":int.from_bytes(b, byteorder="little"), "g":int.from_bytes(g, byteorder="little"), "r":int.from_bytes(r, byteorder="little"), "a":int.from_bytes(a, byteorder="little")} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
             offset += 4 * nbPolys
-            it = iter(polygonColors_list)
-            polygonColors = [{"b": int.from_bytes(b, byteorder="little"), "g": int.from_bytes(g, byteorder="little"), "r": int.from_bytes(r, byteorder="little"), "a": int.from_bytes(a, byteorder="little")} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
-            
-            edges = list(struct.unpack("<{}I".format(nbEdges), data[offset:offset + 4 * nbEdges]))
+
+            # Uncomment this section if needed
+            # edges = list(struct.unpack("<{}I".format(nbEdges), data[offset:offset + 4 * nbEdges]))
             offset += 4 * nbEdges
             
             polygons_list = list(struct.unpack("<{}H".format(12 * nbPolys), data[offset:offset + 24 * nbPolys]))
-            offset += 24 * nbPolys + 24 * nbUnknown2 + 3 * nbUnknown3 + 100 * nbHundreds # Avoiding Unknown2, Unknown3 and Hundreds
             it = iter(polygons_list)
             polygons = [{"vertexIndex1":vertexIndex1, "vertexIndex2":vertexIndex2, "vertexIndex3":vertexIndex3, "normalIndex1":normalIndex1, "normalIndex2":normalIndex2, "normalIndex3":normalIndex3, "edgeIndex1":edgeIndex1, "edgeIndex2":edgeIndex2, "edgeIndex3":edgeIndex3} for _, vertexIndex1, vertexIndex2, vertexIndex3, normalIndex1, normalIndex2, normalIndex3, edgeIndex1, edgeIndex2, edgeIndex3, _, _ in zip(it, it, it, it, it, it, it, it, it, it, it, it)]
+            offset += 24 * nbPolys + 24 * nbUnknown2 + 3 * nbUnknown3 + 100 * nbHundreds # Avoiding Unknown2, Unknown3 and Hundreds
             
             groups_list = list(struct.unpack("<{}L".format(14 * nbGroups), data[offset:offset + 56 * nbGroups]))
-            offset += 56 * nbGroups + 4
             it = iter(groups_list)
             groups = [{"primitiveType":primitiveType, "polygonStartIndex":polygonStartIndex, "nbPolygons":nbPolygons, "verticesStartIndex":verticesStartIndex, "nbVertices":nbVertices, "edgeStartIndex":edgeStartIndex, "nbEdges":nbEdges, "texCoordStartIndex":texCoordStartIndex, "areTexturesUsed":areTexturesUsed, "textureNumber":textureNumber} for primitiveType, polygonStartIndex, nbPolygons, verticesStartIndex, nbVertices, edgeStartIndex, nbEdges, _, _, _, _, texCoordStartIndex, areTexturesUsed, textureNumber in zip(it, it, it, it, it, it, it, it, it, it, it, it, it, it)]
+            offset += 56 * nbGroups + 4
             
-            boundingBoxes_list = list(struct.unpack("<{}f".format(6 * nbBoundingBoxes), data[offset:offset + 24 * nbBoundingBoxes]))
+            # Uncomment this section if needed
+            # boundingBoxes_list = list(struct.unpack("<{}f".format(6 * nbBoundingBoxes), data[offset:offset + 24 * nbBoundingBoxes]))
+            # it = iter(boundingBoxes_list)
+            # boundingBoxes = [[(max_x, max_y, max_z), (min_x, min_y, min_z)] for max_x, max_y, max_z, min_x, min_y, min_z in zip(it, it, it, it, it, it)]
             offset += 24 * nbBoundingBoxes
-            it = iter(boundingBoxes_list)
-            boundingBoxes = [[(max_x, max_y, max_z), (min_x, min_y, min_z)] for max_x, max_y, max_z, min_x, min_y, min_z in zip(it, it, it, it, it, it)]
+
             # Last section is Normal index table, unused
 
             self.polygonGroups = []
@@ -835,21 +841,41 @@ class HRCSkeleton:
                 gr_polygons = polygons[group["polygonStartIndex"]:group["polygonStartIndex"] + group["nbPolygons"]] # Selecting group's polygons
                 for polygon in gr_polygons:
                     # Adding vertices
-                    polygon["vertexIndex1"] += group["verticesStartIndex"]
-                    vert1 = {"vertex":vertices[polygon["vertexIndex1"]], "normal":normals[polygon["normalIndex1"]]}
+                    vert1 = { 
+                        "vertex":vertices[polygon["vertexIndex1"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["vertexIndex1"] + group["verticesStartIndex"]], 
+                        "color":vertexColors[polygon["vertexIndex1"] + group["verticesStartIndex"]], 
+                        "uv":texCoords[polygon["vertexIndex1"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
+                    }
 
-                    polygon["vertexIndex2"] += group["verticesStartIndex"]
-                    vert2 = {"vertex":vertices[polygon["vertexIndex2"]], "normal":normals[polygon["normalIndex2"]]}
+                    vert2 = { 
+                        "vertex":vertices[polygon["vertexIndex2"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["vertexIndex2"] + group["verticesStartIndex"]], 
+                        "color":vertexColors[polygon["vertexIndex2"] + group["verticesStartIndex"]], 
+                        "uv":texCoords[polygon["vertexIndex2"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
+                    }
 
-                    polygon["vertexIndex3"] += group["verticesStartIndex"]
-                    vert3 = {"vertex":vertices[polygon["vertexIndex3"]], "normal":normals[polygon["normalIndex3"]]}
+                    vert3 = { 
+                        "vertex":vertices[polygon["vertexIndex3"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["vertexIndex3"] + group["verticesStartIndex"]], 
+                        "color":vertexColors[polygon["vertexIndex3"] + group["verticesStartIndex"]], 
+                        "uv":texCoords[polygon["vertexIndex3"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
+                    }
 
                     polys.append((vert1, vert2, vert3))
 
-                if group["areTexturesUsed"] == 1: # There's a texture associated with this group
-                    self.polygonGroups.append({ "polygons": polys, "textureFile": textureFiles[group["textureNumber"]] })
-                else: # Polygons with no texture associated
-                    self.polygonGroups.append({ "polygons": polys, "textureFile": None })
+                self.polygonGroups.append({ 
+                    "polygons":polys, 
+                    "textureFile":textureFiles[group["textureNumber"]] if group["areTexturesUsed"] else None
+                })
+            
+        @property
+        def filename(self):
+            return self.__filename
+
+        @filename.setter
+        def filename(self, filename):
+            self.__filename = filename
 
         @property
         def polygonGroups(self):
@@ -881,7 +907,11 @@ class Animation:
             it = iter(rotations_list)
             rotations = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z rotations
             offset += self.nbBones * 12
-            self.frames.append({ "rootRotation" : rootRotation, "rootTranslation" : rootTranslation, "bonesRotations" : rotations })
+            self.frames.append({ 
+                "rootRotation":rootRotation, 
+                "rootTranslation":rootTranslation, 
+                "bonesRotations":rotations 
+            })
 
     @property
     def frames(self):
@@ -946,13 +976,14 @@ def importLgp(context, filepath):
         for model in field.sections[3].models.values(): # Section 3 of Field Module is the Model Loader
             skeletonFile = model.skeletonFile.lower() # Getting the skeleton file's name
             # TODO : Remove this if, debug purpose
-            if skeletonFile != "asjc.hrc":
+            if skeletonFile != "aaaa.hrc":
                 continue
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
                 try:
                     skeleton = HRCSkeleton(os.path.splitext(skeletonFile)[0], charLGP.getFileContent(skeletonFile), charLGP)
-                except:
+                except Exception as e:
+                    print(e)
                     continue
                 animations = {}
             else:
@@ -978,7 +1009,10 @@ def importLgp(context, filepath):
                     del animations[animName]
 
             # Storing (eventually updated) character data
-            character = { "skeleton" : skeleton, "animations" : animations }
+            character = { 
+                "skeleton":skeleton, 
+                "animations":animations 
+            }
             models[skeletonFile] = character
 
     # Now we have all needed objects, we can work in Blender
@@ -995,7 +1029,6 @@ def importLgp(context, filepath):
         meshes = {}
         for bone in model["skeleton"].bones:
             if not bone.pFiles:
-                print("WARNING: No P file for bone {} of skeleton {}".format(bone.name, model["skeleton"].name))
                 continue
             for pFile in bone.pFiles:
                 for i, polygonGroup in enumerate(pFile.polygonGroups):
@@ -1028,6 +1061,20 @@ def importLgp(context, filepath):
                         # Putting information from bmesh to mesh
                         bm.to_mesh(meshData)
                         bm.free()
+
+                        # Defining vertex colors
+                        vertexColor = meshData.vertex_colors.new(name="{}_col".format(meshData.name))
+                        i = 0
+                        for poly in meshData.polygons:
+                            for _ in poly.loop_indices:
+                                vertexColor.data[i].color = (polygon[poly.index]["color"][0], polygon[poly.index]["color"][1], polygon[poly.index]["color"][2], polygon[poly.index]["color"][3])
+                                i += 1
+
+                        # Creating the UV Map
+                        uv_layer = meshData.uv_layers.new(name="{}_uv".format(meshData.name))
+                        for loop in meshData.loops:
+                            if polygon[loop.index]["uv"]:
+                                uv_layer.data[loop.index].uv = polygon[loop.index]["uv"]
 
                         # Storing the mesh object to link it later to the corresponding bone
                         if bone.name not in meshes:
@@ -1062,7 +1109,7 @@ def importLgp(context, filepath):
                     constraint = mesh.constraints.new('COPY_TRANSFORMS')
                     constraint.target = armatureObj
                     constraint.subtarget = bone.name
-            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.object.mode_set(mode="EDIT") # Switching back to Edit mode before looping
 
         viewLayer.objects.active = armatureObj
         bpy.ops.object.mode_set(mode="OBJECT") # Used to validate the Edit mode stuff
@@ -1092,6 +1139,12 @@ def importLgp(context, filepath):
                 scene.frame_end = len(animation.frames)
             break # TODO : Remove this, only for debugging purposes
             
+        # Set the space to Vertex mode to display colors
+        for area in bpy.data.workspaces['Layout'].screens[0].areas:
+            if area.type == 'VIEW_3D':
+                for space in area.spaces:
+                    if space.type == 'VIEW_3D':
+                        space.shading.color_type = 'VERTEX'
     return {'FINISHED'}
 
 # Code taken from Blender import template
