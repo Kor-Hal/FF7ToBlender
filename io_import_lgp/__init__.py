@@ -561,7 +561,18 @@ class FieldModule:
             for _ in range(nbModels):
                 modelNameSize, = struct.unpack("<H", data[offset:offset + 2])
                 offset += 2
-                modelName, _, skeletonFile, _, nbAnim, lightColor1, _, lightColor2, _, lightColor3, _, globalLightColor = struct.unpack("<{}sH8s4sH3s6s3s6s3s6s3s".format(modelNameSize), data[offset:offset + modelNameSize + 46])
+                modelName, \
+                _, \
+                skeletonFile, \
+                _, \
+                nbAnim, \
+                lightColor1, \
+                _, \
+                lightColor2, \
+                _, \
+                lightColor3, \
+                _, \
+                globalLightColor = struct.unpack("<{}sH8s4sH3s6s3s6s3s6s3s".format(modelNameSize), data[offset:offset + modelNameSize + 46])
                 offset += modelNameSize + 46
                 anim = []
                 for _ in range(nbAnim):
@@ -690,13 +701,14 @@ class HRCSkeleton:
 
                         # The NTEX section gives us the number of texture files
                         nbTex = int([i for i in rsdLines if i.startswith("NTEX=")][0][5:])
+                        texFiles = []
                         if nbTex > 0:
                             # We use list comprehension to extract TEX files' names
                             texList = [i[i.find("=") + 1:i.find(".")].lower() + ".tex" for i in rsdLines if i.startswith("TEX[")]
-                        else:
-                            texList = []
+                            for tex in texList:
+                                texFiles.append(self.TextureFile(tex, charLGPFile.getFileContent(tex)))
 
-                        pFile = self.PFile(pFileName, charLGPFile.getFileContent(pFileName), texList)
+                        pFile = self.PFile(pFileName, charLGPFile.getFileContent(pFileName), texFiles)
                         pFileList.append(pFile)
             
                 if name != "" and parent != "" and length != 0.0:
@@ -782,7 +794,21 @@ class HRCSkeleton:
         def __init__(self, filename, data, textureFiles):
             self.filename = filename
 
-            _, _, nbVertices, nbNormals, nbUnknown1, nbTexCoords, nbVertexColors, nbEdges, nbPolys, nbUnknown2, nbUnknown3, nbHundreds, nbGroups, nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
+            # Loading header
+            _, \
+            _, \
+            nbVertices, \
+            nbNormals, \
+            nbUnknown1, \
+            nbTexCoords, \
+            nbVertexColors, \
+            nbEdges, \
+            nbPolys, \
+            nbUnknown2, \
+            nbUnknown3, \
+            nbHundreds, \
+            nbGroups, \
+            nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
             offset = 128 # Header is 128 bytes long
             
             vertices_list = list(struct.unpack("<{}f".format(3 * nbVertices), data[offset:offset + 12 * nbVertices]))
@@ -804,7 +830,15 @@ class HRCSkeleton:
             
             vertexColors_list = list(struct.unpack("<{}c".format(4 * nbVertexColors), data[offset:offset + 4 * nbVertexColors]))
             it = iter(vertexColors_list)
-            vertexColors = [(int.from_bytes(r, byteorder="little")/255, int.from_bytes(g, byteorder="little")/255, int.from_bytes(b, byteorder="little")/255, int.from_bytes(a, byteorder="little")/255) for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
+            vertexColors = [
+                (
+                    int.from_bytes(r, byteorder="little")/255,
+                    int.from_bytes(g, byteorder="little")/255,
+                    int.from_bytes(b, byteorder="little")/255,
+                    int.from_bytes(a, byteorder="little")/255
+                )
+                for b, g, r, a in zip(it, it, it, it)
+                ] # Colors are stored as BGRA
             offset += 4 * nbVertexColors
             
             # Uncomment this section if needed
@@ -819,12 +853,65 @@ class HRCSkeleton:
             
             polygons_list = list(struct.unpack("<{}H".format(12 * nbPolys), data[offset:offset + 24 * nbPolys]))
             it = iter(polygons_list)
-            polygons = [{"vertexIndex1":vertexIndex1, "vertexIndex2":vertexIndex2, "vertexIndex3":vertexIndex3, "normalIndex1":normalIndex1, "normalIndex2":normalIndex2, "normalIndex3":normalIndex3, "edgeIndex1":edgeIndex1, "edgeIndex2":edgeIndex2, "edgeIndex3":edgeIndex3} for _, vertexIndex1, vertexIndex2, vertexIndex3, normalIndex1, normalIndex2, normalIndex3, edgeIndex1, edgeIndex2, edgeIndex3, _, _ in zip(it, it, it, it, it, it, it, it, it, it, it, it)]
+            polygons = [
+                { 
+                "vertexIndex1":vertexIndex1, 
+                "vertexIndex2":vertexIndex2, 
+                "vertexIndex3":vertexIndex3, 
+                "normalIndex1":normalIndex1, 
+                "normalIndex2":normalIndex2, 
+                "normalIndex3":normalIndex3, 
+                "edgeIndex1":edgeIndex1, 
+                "edgeIndex2":edgeIndex2, 
+                "edgeIndex3":edgeIndex3 
+                } 
+                for _,
+                    vertexIndex1,
+                    vertexIndex2,
+                    vertexIndex3,
+                    normalIndex1,
+                    normalIndex2,
+                    normalIndex3,
+                    edgeIndex1,
+                    edgeIndex2,
+                    edgeIndex3,
+                    _,
+                    _ 
+                in zip(it, it, it, it, it, it, it, it, it, it, it, it)
+            ]
             offset += 24 * nbPolys + 24 * nbUnknown2 + 3 * nbUnknown3 + 100 * nbHundreds # Avoiding Unknown2, Unknown3 and Hundreds
             
             groups_list = list(struct.unpack("<{}L".format(14 * nbGroups), data[offset:offset + 56 * nbGroups]))
             it = iter(groups_list)
-            groups = [{"primitiveType":primitiveType, "polygonStartIndex":polygonStartIndex, "nbPolygons":nbPolygons, "verticesStartIndex":verticesStartIndex, "nbVertices":nbVertices, "edgeStartIndex":edgeStartIndex, "nbEdges":nbEdges, "texCoordStartIndex":texCoordStartIndex, "areTexturesUsed":areTexturesUsed, "textureNumber":textureNumber} for primitiveType, polygonStartIndex, nbPolygons, verticesStartIndex, nbVertices, edgeStartIndex, nbEdges, _, _, _, _, texCoordStartIndex, areTexturesUsed, textureNumber in zip(it, it, it, it, it, it, it, it, it, it, it, it, it, it)]
+            groups = [
+                {
+                    "primitiveType":primitiveType, 
+                    "polygonStartIndex":polygonStartIndex, 
+                    "nbPolygons":nbPolygons, 
+                    "verticesStartIndex":verticesStartIndex, 
+                    "nbVertices":nbVertices, 
+                    "edgeStartIndex":edgeStartIndex, 
+                    "nbEdges":nbEdges, 
+                    "texCoordStartIndex":texCoordStartIndex, 
+                    "areTexturesUsed":areTexturesUsed, 
+                    "textureNumber":textureNumber
+                } 
+                for primitiveType,
+                    polygonStartIndex,
+                    nbPolygons,
+                    verticesStartIndex,
+                    nbVertices,
+                    edgeStartIndex,
+                    nbEdges,
+                    _,
+                    _,
+                    _,
+                    _,
+                    texCoordStartIndex,
+                    areTexturesUsed,
+                    textureNumber 
+                in zip(it, it, it, it, it, it, it, it, it, it, it, it, it, it)
+            ]
             offset += 56 * nbGroups + 4
             
             # Uncomment this section if needed
@@ -884,6 +971,104 @@ class HRCSkeleton:
         @polygonGroups.setter
         def polygonGroups(self, polygonGroups):
             self.__polygonGroups = polygonGroups
+
+    class TextureFile:
+        def __init__(self, filename, data):
+            self.filename = filename
+
+            # Loading header
+            _, \
+            _, \
+            colorKeyFlag, \
+            _, \
+            _, \
+            minBitsPerColor, \
+            maxBitsPerColor, \
+            minAlphaBits, \
+            maxAlphaBits, \
+            minBitsPerPixel, \
+            maxBitsPerPixel, \
+            _, \
+            numPalettes, \
+            numColorsPerPalette, \
+            bitDepth, \
+            width, \
+            height, \
+            _, \
+            _, \
+            paletteFlag, \
+            bitsPerIndex, \
+            _, \
+            paletteSize, \
+            _, \
+            _, \
+            bitsPerPixel, \
+            bytesPerPixel = struct.unpack("<27L", data[:108])
+            offset = 108 # Header is 108 bytes long
+
+            # Every image in FF7 is supposed to be paletted, but you never know...
+            if not paletteFlag:
+                # Pixel format
+                numRedBits, \
+                numGreenBits, \
+                numBlueBits, \
+                numAlphaBits, \
+                redBitmask, \
+                greenBitmask, \
+                blueBitmask, \
+                alphaBitmask, \
+                redShift, \
+                greenShift, \
+                blueShift, \
+                alphaShift, \
+                _, \
+                _, \
+                _, \
+                _, \
+                redMax, \
+                greenMax, \
+                blueMax, \
+                alphaMax = struct.unpack("<20L", data[offset:offset + 80])
+
+            offset += 80
+
+            colorKeyArrayFlag, \
+            _, \
+            referenceAlpha = struct.unpack("<3L", data[offset:offset + 12])
+            offset += 48 # Skipping unused bytes
+
+            if paletteFlag:
+                # Palette data
+                paletteData_list = list(struct.unpack("<{}c".format(4 * paletteSize), data[offset:offset + 4 * paletteSize]))
+                it = iter(paletteData_list)
+                paletteData = [
+                        (
+                            int.from_bytes(r, byteorder="little")/255,
+                            int.from_bytes(g, byteorder="little")/255,
+                            int.from_bytes(b, byteorder="little")/255,
+                            int.from_bytes(a, byteorder="little")/255 if a != '\xFE' else referenceAlpha
+                        )
+                        for b, g, r, a in zip(it, it, it, it)
+                    ] # Colors are stored as BGRA
+                offset += 4 * paletteSize
+            else:
+                paletteData = None
+
+            pixelData = struct.unpack("<{}c".format(width * height * bytesPerPixel), data[offset:offset + width * height * bytesPerPixel])
+            offset += width * height * bytesPerPixel
+
+            if colorKeyFlag and colorKeyArrayFlag:
+                colorKeyArray = struct.unpack("<{}c".format(numPalettes), data[offset:offset + numPalettes])
+            else:
+                colorKeyArray = None
+
+        @property
+        def filename(self):
+            return self.__filename
+
+        @filename.setter
+        def filename(self, filename):
+            self.__filename = filename
 
 class Animation:
     def __init__(self, data):
