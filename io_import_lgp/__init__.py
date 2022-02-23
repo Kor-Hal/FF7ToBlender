@@ -942,21 +942,21 @@ class HRCSkeleton:
                     # Adding vertices
                     vert1 = { 
                         "vertex":vertices[polygon["vertexIndex1"] + group["verticesStartIndex"]], 
-                        "normal":normals[polygon["vertexIndex1"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["normalIndex1"] + group["verticesStartIndex"]], 
                         "color":vertexColors[polygon["vertexIndex1"] + group["verticesStartIndex"]], 
                         "uv":texCoords[polygon["vertexIndex1"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
                     }
 
                     vert2 = { 
                         "vertex":vertices[polygon["vertexIndex2"] + group["verticesStartIndex"]], 
-                        "normal":normals[polygon["vertexIndex2"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["normalIndex2"] + group["verticesStartIndex"]], 
                         "color":vertexColors[polygon["vertexIndex2"] + group["verticesStartIndex"]], 
                         "uv":texCoords[polygon["vertexIndex2"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
                     }
 
                     vert3 = { 
                         "vertex":vertices[polygon["vertexIndex3"] + group["verticesStartIndex"]], 
-                        "normal":normals[polygon["vertexIndex3"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["normalIndex3"] + group["verticesStartIndex"]], 
                         "color":vertexColors[polygon["vertexIndex3"] + group["verticesStartIndex"]], 
                         "uv":texCoords[polygon["vertexIndex3"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
                     }
