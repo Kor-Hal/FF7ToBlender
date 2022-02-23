@@ -3,7 +3,7 @@
 bl_info = {
     "name": "Final Fantasy 7 flevel LGP import/export",
     "author": "Sébastien Dougnac",
-    "blender": (2, 82, 0),
+    "blender": (3, 0, 1),
     "location": "File > Import-Export",
     "description": "Import-Export flevel LGP models and animations",
     "warning": "",
@@ -706,14 +706,26 @@ class HRCSkeleton:
                             # We use list comprehension to extract TEX files' names
                             texList = [i[i.find("=") + 1:i.find(".")].lower() + ".tex" for i in rsdLines if i.startswith("TEX[")]
                             for tex in texList:
-                                texFiles.append(self.TextureFile(tex, charLGPFile.getFileContent(tex)))
+                                try:
+                                    texFiles.append(self.TextureFile(tex, charLGPFile.getFileContent(tex)))
+                                except Exception as e:
+                                    print("Error creating TextureFile {} : {}".format(tex, e))
+                                    raise
 
-                        pFile = self.PFile(pFileName, charLGPFile.getFileContent(pFileName), texFiles)
-                        pFileList.append(pFile)
+                        try:
+                            pFile = self.PFile(pFileName, charLGPFile.getFileContent(pFileName), texFiles)
+                            pFileList.append(pFile)
+                        except Exception as e:
+                            print("Error creating P file {} : {}".format(pFileName, e))
+                            raise
             
                 if name != "" and parent != "" and length != 0.0:
-                    bone = self.HRCBone(name, parent, length, pFileList)
-                    self.bones.append(bone)
+                    try:
+                        bone = self.HRCBone(name, parent, length, pFileList)
+                        self.bones.append(bone)
+                    except Exception as e:
+                        print("Error creating HRCBone {} : {}".format(name, e))
+                        raise
             
                 newBone = False
             else: # Line within a bone
@@ -991,7 +1003,7 @@ class HRCSkeleton:
             _, \
             numPalettes, \
             numColorsPerPalette, \
-            bitDepth, \
+            self.bitDepth, \
             self.width, \
             self.height, \
             _, \
@@ -1111,6 +1123,14 @@ class HRCSkeleton:
             self.__height = height
 
         @property
+        def bitDepth(self):
+            return self.__bitDepth
+
+        @bitDepth.setter
+        def bitDepth(self, bitDepth):
+            self.__bitDepth = bitDepth
+
+        @property
         def pixels(self):
             return self.__pixels
 
@@ -1216,8 +1236,8 @@ def importLgp(context, filepath):
                 try:
                     skeleton = HRCSkeleton(os.path.splitext(skeletonFile)[0], charLGP.getFileContent(skeletonFile), charLGP)
                 except Exception as e:
-                    print(e)
-                    continue
+                    print("Error creating HRCSkeleton {} : {}".format(skeletonFile, e))
+                    raise
                 animations = {}
             else:
                 # We already know the current skeleton, we take it and its animations
@@ -1268,8 +1288,11 @@ def importLgp(context, filepath):
                     # Creating image (= texture) and attach it to a material
                     image = None
                     if polygonGroup["textureFile"]:
-                        image = bpy.data.images.new("{}_{}_tex".format(bone.name,i), width=polygonGroup["textureFile"].width, height=polygonGroup["textureFile"].height)
+                        image = bpy.data.images.new("{}_{}_tex".format(bone.name,i), width=polygonGroup["textureFile"].width, height=polygonGroup["textureFile"].height, alpha=True)
+                        image.source = "GENERATED"
+                        image.file_format = "BMP"
                         image.pixels = polygonGroup["textureFile"].pixels
+                        image.depth = polygonGroup["textureFile"].bitDepth
                         # TODO : Create material
 
                     # Creating meshes
