@@ -414,15 +414,15 @@ class LGPFile:
     def __init__(self, data):
         self.toc = {}
         offset = 12 # Ignoring the first 12 bytes (File creator)
-        nb_files, = struct.unpack("<I", data[offset:offset + 4])
+        numFiles, = struct.unpack("<I", data[offset:offset + 4])
         offset += 4
-        if nb_files > 0: # If we have at least one file, we process the first one's information outside of the loop
+        if numFiles > 0: # If we have at least one file, we process the first one's information outside of the loop
             filename, first_offset = struct.unpack("<20sI", data[offset:offset + 24])
             filename = filename.decode("utf-8").rstrip('\x00')
             offset += 24
             self.toc[filename] = first_offset
             offset += 3 # Avoiding useless information
-        for _ in range(nb_files - 1): # Now we process all remaining files
+        for _ in range(numFiles - 1): # Now we process all remaining files
             filename, fileOffset = struct.unpack("<20sI", data[offset:offset + 24])
             filename = filename.decode("utf-8").rstrip('\x00')
             offset += 24
@@ -526,9 +526,9 @@ class FieldModule:
     def __init__(self, data):
         self.sections = { k : None for k in range(1,10) } # Field Module always has 9 sections
 
-        _, nbSections, sec1off, sec2off, sec3off, sec4off, sec5off, sec6off, sec7off, sec8off, sec9off = struct.unpack("<H10I", data[:42])
-        if nbSections != 9:
-            raise ValueError("The Field Module must have exactly 9 sections ({} encountered)".format(nbSections))
+        _, numSections, sec1off, sec2off, sec3off, sec4off, sec5off, sec6off, sec7off, sec8off, sec9off = struct.unpack("<H10I", data[:42])
+        if numSections != 9:
+            raise ValueError("The Field Module must have exactly 9 sections ({} encountered)".format(numSections))
         
         for i in range(1,10):
             secOff = eval("sec{}off".format(i)) # Getting the offset for the current section
@@ -554,18 +554,18 @@ class FieldModule:
 
     class ModelLoader:
         def __init__(self, data):
-            _, nbModels, _ = struct.unpack("<3H", data[:6]) # Header
+            _, numModels, _ = struct.unpack("<3H", data[:6]) # Header
             offset = 6 # Position after header
             self.models = {}
 
-            for _ in range(nbModels):
+            for _ in range(numModels):
                 modelNameSize, = struct.unpack("<H", data[offset:offset + 2])
                 offset += 2
                 modelName, \
                 _, \
                 skeletonFile, \
                 _, \
-                nbAnim, \
+                numAnim, \
                 lightColor1, \
                 _, \
                 lightColor2, \
@@ -575,7 +575,7 @@ class FieldModule:
                 globalLightColor = struct.unpack("<{}sH8s4sH3s6s3s6s3s6s3s".format(modelNameSize), data[offset:offset + modelNameSize + 46])
                 offset += modelNameSize + 46
                 anim = []
-                for _ in range(nbAnim):
+                for _ in range(numAnim):
                     animNameSize, = struct.unpack("<H", data[offset:offset + 2])
                     offset += 2
                     animFile, = struct.unpack("<{}s".format(animNameSize), data[offset:offset + animNameSize])
@@ -668,7 +668,7 @@ class HRCSkeleton:
         hrcLines = [hrcLine for hrcLine in hrcLines if hrcLine[:1] != "#"] # Removing comments
 
         self.name = hrcLines[1].split(" ")[1]
-        self.nbBones = int(hrcLines[2].split(" ")[1])
+        self.numBones = int(hrcLines[2].split(" ")[1])
         self.bones = []
         name = parent = ""
         length = 0.0
@@ -700,9 +700,9 @@ class HRCSkeleton:
                         pFileName = os.path.splitext(pFileName)[0] + ".p"
 
                         # The NTEX section gives us the number of texture files
-                        nbTex = int([i for i in rsdLines if i.startswith("NTEX=")][0][5:])
+                        numTex = int([i for i in rsdLines if i.startswith("NTEX=")][0][5:])
                         texFiles = []
-                        if nbTex > 0:
+                        if numTex > 0:
                             # We use list comprehension to extract TEX files' names
                             texList = [i[i.find("=") + 1:i.find(".")].lower() + ".tex" for i in rsdLines if i.startswith("TEX[")]
                             for tex in texList:
@@ -736,12 +736,12 @@ class HRCSkeleton:
         self.__name = name
         
     @property
-    def nbBones(self):
-        return self.__nbBones
+    def numBones(self):
+        return self.__numBones
     
-    @nbBones.setter
-    def nbBones(self, nbBones):
-        self.__nbBones = nbBones if nbBones > 0 else 1 # Default number of bones is 1
+    @numBones.setter
+    def numBones(self, numBones):
+        self.__numBones = numBones if numBones > 0 else 1 # Default number of bones is 1
         
     @property
     def bones(self):
@@ -797,38 +797,38 @@ class HRCSkeleton:
             # Loading header
             _, \
             _, \
-            nbVertices, \
-            nbNormals, \
-            nbUnknown1, \
-            nbTexCoords, \
-            nbVertexColors, \
-            nbEdges, \
-            nbPolys, \
-            nbUnknown2, \
-            nbUnknown3, \
-            nbHundreds, \
-            nbGroups, \
-            nbBoundingBoxes = struct.unpack("<Q13L", data[:60])
+            numVertices, \
+            numNormals, \
+            numUnknown1, \
+            numTexCoords, \
+            numVertexColors, \
+            numEdges, \
+            numPolys, \
+            numUnknown2, \
+            numUnknown3, \
+            numHundreds, \
+            numGroups, \
+            numBoundingBoxes = struct.unpack("<Q13L", data[:60])
             offset = 128 # Header is 128 bytes long
             
-            vertices_list = list(struct.unpack("<{}f".format(3 * nbVertices), data[offset:offset + 12 * nbVertices]))
+            vertices_list = list(struct.unpack("<{}f".format(3 * numVertices), data[offset:offset + 12 * numVertices]))
             it = iter(vertices_list)
             vertices = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
             vertices = [(x, -z, y) for x, y, z in vertices] # Converting coordinates between FF7's referential and Blender's
-            offset += 12 * nbVertices
+            offset += 12 * numVertices
             
-            normals_list = list(struct.unpack("<{}f".format(3 * nbNormals), data[offset:offset + 12 * nbNormals]))
+            normals_list = list(struct.unpack("<{}f".format(3 * numNormals), data[offset:offset + 12 * numNormals]))
             it = iter(normals_list)
             normals = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
             normals = [(x, -z, y) for x, y, z in normals] # Converting coordinates between FF7's referential and Blender's
-            offset += 12 * nbNormals + 12 * nbUnknown1 # Avoiding unknown block
+            offset += 12 * numNormals + 12 * numUnknown1 # Avoiding unknown block
 
-            texCoords_list = list(struct.unpack("<{}f".format(2 * nbTexCoords), data[offset:offset + 8 * nbTexCoords]))
+            texCoords_list = list(struct.unpack("<{}f".format(2 * numTexCoords), data[offset:offset + 8 * numTexCoords]))
             it = iter(texCoords_list)
             texCoords = list(zip(it, it)) # Tex coords are tuples of X and Y coordinates
-            offset += 8 * nbTexCoords
+            offset += 8 * numTexCoords
             
-            vertexColors_list = list(struct.unpack("<{}c".format(4 * nbVertexColors), data[offset:offset + 4 * nbVertexColors]))
+            vertexColors_list = list(struct.unpack("<{}c".format(4 * numVertexColors), data[offset:offset + 4 * numVertexColors]))
             it = iter(vertexColors_list)
             vertexColors = [
                 (
@@ -839,19 +839,19 @@ class HRCSkeleton:
                 )
                 for b, g, r, a in zip(it, it, it, it)
                 ] # Colors are stored as BGRA
-            offset += 4 * nbVertexColors
+            offset += 4 * numVertexColors
             
             # Uncomment this section if needed
-            # polygonColors_list = list(struct.unpack("<{}c".format(4 * nbPolys), data[offset:offset + 4 * nbPolys]))
+            # polygonColors_list = list(struct.unpack("<{}c".format(4 * numPolys), data[offset:offset + 4 * numPolys]))
             # it = iter(polygonColors_list)
             # polygonColors = [{"b":int.from_bytes(b, byteorder="little"), "g":int.from_bytes(g, byteorder="little"), "r":int.from_bytes(r, byteorder="little"), "a":int.from_bytes(a, byteorder="little")} for b, g, r, a in zip(it, it, it, it)] # Colors are stored as BGRA
-            offset += 4 * nbPolys
+            offset += 4 * numPolys
 
             # Uncomment this section if needed
-            # edges = list(struct.unpack("<{}I".format(nbEdges), data[offset:offset + 4 * nbEdges]))
-            offset += 4 * nbEdges
+            # edges = list(struct.unpack("<{}I".format(numEdges), data[offset:offset + 4 * numEdges]))
+            offset += 4 * numEdges
             
-            polygons_list = list(struct.unpack("<{}H".format(12 * nbPolys), data[offset:offset + 24 * nbPolys]))
+            polygons_list = list(struct.unpack("<{}H".format(12 * numPolys), data[offset:offset + 24 * numPolys]))
             it = iter(polygons_list)
             polygons = [
                 { 
@@ -879,30 +879,30 @@ class HRCSkeleton:
                     _ 
                 in zip(it, it, it, it, it, it, it, it, it, it, it, it)
             ]
-            offset += 24 * nbPolys + 24 * nbUnknown2 + 3 * nbUnknown3 + 100 * nbHundreds # Avoiding Unknown2, Unknown3 and Hundreds
+            offset += 24 * numPolys + 24 * numUnknown2 + 3 * numUnknown3 + 100 * numHundreds # Avoiding Unknown2, Unknown3 and Hundreds
             
-            groups_list = list(struct.unpack("<{}L".format(14 * nbGroups), data[offset:offset + 56 * nbGroups]))
+            groups_list = list(struct.unpack("<{}L".format(14 * numGroups), data[offset:offset + 56 * numGroups]))
             it = iter(groups_list)
             groups = [
                 {
                     "primitiveType":primitiveType, 
                     "polygonStartIndex":polygonStartIndex, 
-                    "nbPolygons":nbPolygons, 
+                    "numPolygons":numPolygons, 
                     "verticesStartIndex":verticesStartIndex, 
-                    "nbVertices":nbVertices, 
+                    "numVertices":numVertices, 
                     "edgeStartIndex":edgeStartIndex, 
-                    "nbEdges":nbEdges, 
+                    "numEdges":numEdges, 
                     "texCoordStartIndex":texCoordStartIndex, 
                     "areTexturesUsed":areTexturesUsed, 
                     "textureNumber":textureNumber
                 } 
                 for primitiveType,
                     polygonStartIndex,
-                    nbPolygons,
+                    numPolygons,
                     verticesStartIndex,
-                    nbVertices,
+                    numVertices,
                     edgeStartIndex,
-                    nbEdges,
+                    numEdges,
                     _,
                     _,
                     _,
@@ -912,20 +912,20 @@ class HRCSkeleton:
                     textureNumber 
                 in zip(it, it, it, it, it, it, it, it, it, it, it, it, it, it)
             ]
-            offset += 56 * nbGroups + 4
+            offset += 56 * numGroups + 4
             
             # Uncomment this section if needed
-            # boundingBoxes_list = list(struct.unpack("<{}f".format(6 * nbBoundingBoxes), data[offset:offset + 24 * nbBoundingBoxes]))
+            # boundingBoxes_list = list(struct.unpack("<{}f".format(6 * numBoundingBoxes), data[offset:offset + 24 * numBoundingBoxes]))
             # it = iter(boundingBoxes_list)
             # boundingBoxes = [[(max_x, max_y, max_z), (min_x, min_y, min_z)] for max_x, max_y, max_z, min_x, min_y, min_z in zip(it, it, it, it, it, it)]
-            offset += 24 * nbBoundingBoxes
+            offset += 24 * numBoundingBoxes
 
             # Last section is Normal index table, unused
 
             self.polygonGroups = []
             for group in groups:
                 polys = []
-                gr_polygons = polygons[group["polygonStartIndex"]:group["polygonStartIndex"] + group["nbPolygons"]] # Selecting group's polygons
+                gr_polygons = polygons[group["polygonStartIndex"]:group["polygonStartIndex"] + group["numPolygons"]] # Selecting group's polygons
                 for polygon in gr_polygons:
                     # Adding vertices
                     vert1 = { 
@@ -992,8 +992,8 @@ class HRCSkeleton:
             numPalettes, \
             numColorsPerPalette, \
             bitDepth, \
-            width, \
-            height, \
+            self.width, \
+            self.height, \
             _, \
             _, \
             paletteFlag, \
@@ -1042,25 +1042,49 @@ class HRCSkeleton:
                 paletteData_list = list(struct.unpack("<{}c".format(4 * paletteSize), data[offset:offset + 4 * paletteSize]))
                 it = iter(paletteData_list)
                 paletteData = [
-                        (
-                            int.from_bytes(r, byteorder="little")/255,
-                            int.from_bytes(g, byteorder="little")/255,
-                            int.from_bytes(b, byteorder="little")/255,
-                            int.from_bytes(a, byteorder="little")/255 if a != '\xFE' else referenceAlpha
-                        )
-                        for b, g, r, a in zip(it, it, it, it)
-                    ] # Colors are stored as BGRA
+                    (
+                        int.from_bytes(r, byteorder="little")/255,
+                        int.from_bytes(g, byteorder="little")/255,
+                        int.from_bytes(b, byteorder="little")/255,
+                        int.from_bytes(a, byteorder="little")/255 if a != '\xFE' else referenceAlpha
+                    )
+                    for b, g, r, a in zip(it, it, it, it)
+                ] # Colors are stored as BGRA
                 offset += 4 * paletteSize
             else:
                 paletteData = None
 
-            pixelData = struct.unpack("<{}c".format(width * height * bytesPerPixel), data[offset:offset + width * height * bytesPerPixel])
-            offset += width * height * bytesPerPixel
+            pixelData = []
+            pixelData_ba = bytearray(data[offset:offset + self.width * self.height * bytesPerPixel])
+            for i in range(0, self.width * self.height * bytesPerPixel, bytesPerPixel):
+                pixelData.append(int.from_bytes(pixelData_ba[i:i + bytesPerPixel], byteorder="little"))
+            offset += self.width * self.height * bytesPerPixel
 
             if colorKeyFlag and colorKeyArrayFlag:
                 colorKeyArray = struct.unpack("<{}c".format(numPalettes), data[offset:offset + numPalettes])
             else:
                 colorKeyArray = None
+
+            self.pixels = [None] * self.width * self.height
+
+            if paletteFlag:
+                # Every value in pixelData is an index referencing the palette
+                for i, index in enumerate(pixelData):
+                    if colorKeyFlag and colorKeyArray:
+                        # Update the colorKeyFlag according to the array
+                        colorKeyFlag = colorKeyArray[index]
+
+                    if colorKeyFlag and index == 0:
+                        # The pixel needs to be transparent, aka having an alpha value of 0
+                        self.pixels[i] = (0,0,0,0)
+                    else:
+                        # No color keying to perform
+                        self.pixels[i] = paletteData[index]
+
+                # Flatten the list of tuples
+                self.pixels = list(sum(self.pixels, ()))
+            else:
+                pass # No idea how to use non-paletted data. Should not be used in FF7 anyway
 
         @property
         def filename(self):
@@ -1070,10 +1094,34 @@ class HRCSkeleton:
         def filename(self, filename):
             self.__filename = filename
 
+        @property
+        def width(self):
+            return self.__width
+
+        @width.setter
+        def width(self, width):
+            self.__width = width
+
+        @property
+        def height(self):
+            return self.__height
+
+        @height.setter
+        def height(self, height):
+            self.__height = height
+
+        @property
+        def pixels(self):
+            return self.__pixels
+
+        @pixels.setter
+        def pixels(self, pixels):
+            self.__pixels = pixels
+
 class Animation:
     def __init__(self, data):
         self.frames = []
-        _, nbFrames, self.nbBones, firstRotation, secondRotation, thirdRotation = struct.unpack("<3I3c", data[:15])
+        _, numFrames, self.numBones, firstRotation, secondRotation, thirdRotation = struct.unpack("<3I3c", data[:15])
         offset = 36 # Header's size
         # Converting rotations to X / Y / Z letters
         firstRotation = chr(int.from_bytes(firstRotation, byteorder="little") + 88)
@@ -1083,15 +1131,15 @@ class Animation:
         self.rotationOrder = "{}{}{}".format(firstRotation, secondRotation, thirdRotation)
 
         # Getting all frames info
-        for _ in range(nbFrames):
+        for _ in range(numFrames):
             rootRotation = list(struct.unpack("<3f", data[offset:offset + 12]))
             offset += 12
             rootTranslation = list(struct.unpack("<3f", data[offset:offset + 12]))
             offset += 12
-            rotations_list = list(struct.unpack("<{}f".format(self.nbBones * 3), data[offset:offset + self.nbBones * 12]))
+            rotations_list = list(struct.unpack("<{}f".format(self.numBones * 3), data[offset:offset + self.numBones * 12]))
             it = iter(rotations_list)
             rotations = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z rotations
-            offset += self.nbBones * 12
+            offset += self.numBones * 12
             self.frames.append({ 
                 "rootRotation":rootRotation, 
                 "rootTranslation":rootTranslation, 
@@ -1107,12 +1155,12 @@ class Animation:
         self.__frames = frames
     
     @property
-    def nbBones(self):
-        return self.__nbBones
+    def numBones(self):
+        return self.__numBones
 
-    @nbBones.setter
-    def nbBones(self, nbBones):
-        self.__nbBones = nbBones
+    @numBones.setter
+    def numBones(self, numBones):
+        self.__numBones = numBones
 
     @property
     def rotationOrder(self):
@@ -1185,11 +1233,11 @@ def importLgp(context, filepath):
                         continue
 
             # Checking that animations have the same number of bones as skeleton
-            # TODO : Replace this with animations = { k:v for k,v in animations.items() if skeleton.nbBones == v.nbBones }
+            # TODO : Replace this with animations = { k:v for k,v in animations.items() if skeleton.numBones == v.numBones }
             for animName in list(animations.keys()):
-                if skeleton.nbBones != animations[animName].nbBones and not(skeleton.nbBones == 1 and animations[animName].nbBones == 0):
+                if skeleton.numBones != animations[animName].numBones and not(skeleton.numBones == 1 and animations[animName].numBones == 0):
                     # For debugging purposes
-                    print("ERROR : {} - {} {} has {} bones and its animation {} has {} bones.".format(filename, skeleton.name, skeletonFile, skeleton.nbBones, animName, animations[animName].nbBones))
+                    print("ERROR : {} - {} {} has {} bones and its animation {} has {} bones.".format(filename, skeleton.name, skeletonFile, skeleton.numBones, animName, animations[animName].numBones))
                     # Removing the incorrect animation
                     del animations[animName]
 
@@ -1217,6 +1265,14 @@ def importLgp(context, filepath):
                 continue
             for pFile in bone.pFiles:
                 for i, polygonGroup in enumerate(pFile.polygonGroups):
+                    # Creating image (= texture) and attach it to a material
+                    image = None
+                    if polygonGroup["textureFile"]:
+                        image = bpy.data.images.new("{}_{}_tex".format(bone.name,i), width=polygonGroup["textureFile"].width, height=polygonGroup["textureFile"].height)
+                        image.pixels = polygonGroup["textureFile"].pixels
+                        # TODO : Create material
+
+                    # Creating meshes
                     for j, polygon in enumerate(polygonGroup["polygons"]):
                         # Creating a mesh for the current polygon and linking it to the current scene
                         meshData = bpy.data.meshes.new("{}_{}_{}".format(bone.name,i,j))
@@ -1260,6 +1316,10 @@ def importLgp(context, filepath):
                         for loop in meshData.loops:
                             if polygon[loop.index]["uv"]:
                                 uv_layer.data[loop.index].uv = polygon[loop.index]["uv"]
+
+                        if image:
+                            # TODO : Add material to mesh
+                            pass
 
                         # Storing the mesh object to link it later to the corresponding bone
                         if bone.name not in meshes:
