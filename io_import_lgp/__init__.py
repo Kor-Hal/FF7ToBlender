@@ -942,27 +942,27 @@ class HRCSkeleton:
                     # Adding vertices
                     vert1 = { 
                         "vertex":vertices[polygon["vertexIndex1"] + group["verticesStartIndex"]], 
-                        "normal":normals[polygon["normalIndex1"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["normalIndex1"]], 
                         "color":vertexColors[polygon["vertexIndex1"] + group["verticesStartIndex"]], 
                         "uv":texCoords[polygon["vertexIndex1"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
                     }
 
                     vert2 = { 
                         "vertex":vertices[polygon["vertexIndex2"] + group["verticesStartIndex"]], 
-                        "normal":normals[polygon["normalIndex2"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["normalIndex2"]], 
                         "color":vertexColors[polygon["vertexIndex2"] + group["verticesStartIndex"]], 
                         "uv":texCoords[polygon["vertexIndex2"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
                     }
 
                     vert3 = { 
                         "vertex":vertices[polygon["vertexIndex3"] + group["verticesStartIndex"]], 
-                        "normal":normals[polygon["normalIndex3"] + group["verticesStartIndex"]], 
+                        "normal":normals[polygon["normalIndex3"]], 
                         "color":vertexColors[polygon["vertexIndex3"] + group["verticesStartIndex"]], 
                         "uv":texCoords[polygon["vertexIndex3"] + group["texCoordStartIndex"]] if group["areTexturesUsed"] else None
                     }
 
                     polys.append((vert1, vert2, vert3))
-
+                
                 self.polygonGroups.append({ 
                     "polygons":polys, 
                     "textureFile":textureFiles[group["textureNumber"]] if group["areTexturesUsed"] else None
@@ -1292,7 +1292,6 @@ def importLgp(context, filepath):
                         image.source = "GENERATED"
                         image.file_format = "BMP"
                         image.pixels = polygonGroup["textureFile"].pixels
-                        image.depth = polygonGroup["textureFile"].bitDepth
                         # TODO : Create material
 
                     # Creating meshes
