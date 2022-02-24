@@ -414,16 +414,25 @@ class LGPFile:
     def __init__(self, data):
         self.toc = {}
         offset = 12 # Ignoring the first 12 bytes (File creator)
-        numFiles, = struct.unpack("<I", data[offset:offset + 4])
+        numFiles, = struct.unpack(
+            "<I", 
+            data[offset:offset + 4]
+        )
         offset += 4
         if numFiles > 0: # If we have at least one file, we process the first one's information outside of the loop
-            filename, first_offset = struct.unpack("<20sI", data[offset:offset + 24])
+            filename, first_offset = struct.unpack(
+                "<20sI", 
+                data[offset:offset + 24]
+            )
             filename = filename.decode("utf-8").rstrip('\x00')
             offset += 24
             self.toc[filename] = first_offset
             offset += 3 # Avoiding useless information
         for _ in range(numFiles - 1): # Now we process all remaining files
-            filename, fileOffset = struct.unpack("<20sI", data[offset:offset + 24])
+            filename, fileOffset = struct.unpack(
+                "<20sI", 
+                data[offset:offset + 24]
+            )
             filename = filename.decode("utf-8").rstrip('\x00')
             offset += 24
             if fileOffset < first_offset:
@@ -461,7 +470,10 @@ class LGPFile:
         start_len = self.toc[filename] + 20
         start_pos = self.toc[filename] + 24
         
-        length = int.from_bytes(self.files[start_len:start_pos], byteorder="little")
+        length = int.from_bytes(
+            self.files[start_len:start_pos], 
+            byteorder="little"
+        )
         
         return self.files[start_pos:start_pos + length]
 
@@ -470,10 +482,17 @@ class LZSSFile:
         self.uncompressedData = bytearray()
 
         # Header is 4 bytes defining the file's length, not including itself
-        header, = struct.unpack("<I", data[:4])
+        header, = struct.unpack(
+                        "<I", 
+                        data[:4]
+                    )
         fileOffset = 4
         if len(data) - 4 != header:
-            raise ValueError("Not a valid LZSS file : File size {} doesn't match header's information {}".format(len(data), header + 4))
+            raise ValueError("Not a valid LZSS file : File size {} doesn't match header's information {}".format(
+                                                                                                                len(data), 
+                                                                                                                header + 4
+                                                                                                            )
+            )
             
         buffer = bytearray(4096)
         bufferPos = int("0xFEE", 0)
@@ -526,13 +545,29 @@ class FieldModule:
     def __init__(self, data):
         self.sections = { k : None for k in range(1,10) } # Field Module always has 9 sections
 
-        _, numSections, sec1off, sec2off, sec3off, sec4off, sec5off, sec6off, sec7off, sec8off, sec9off = struct.unpack("<H10I", data[:42])
+        _, \
+        numSections, \
+        sec1off, \
+        sec2off, \
+        sec3off, \
+        sec4off, \
+        sec5off, \
+        sec6off, \
+        sec7off, \
+        sec8off, \
+        sec9off = struct.unpack(
+                        "<H10I", 
+                        data[:42]
+                    )
         if numSections != 9:
             raise ValueError("The Field Module must have exactly 9 sections ({} encountered)".format(numSections))
         
         for i in range(1,10):
             secOff = eval("sec{}off".format(i)) # Getting the offset for the current section
-            secLen, = struct.unpack("<I", data[secOff:secOff + 4]) # The first 4 bytes are the length of the section
+            secLen, = struct.unpack(
+                            "<I", 
+                            data[secOff:secOff + 4]
+                        ) # The first 4 bytes are the length of the section
             secOff += 4 # Getting the real starting offset for the section
             self.sections[i] = data[secOff:secOff + secLen] # Storing binary data for this section
 
@@ -554,12 +589,20 @@ class FieldModule:
 
     class ModelLoader:
         def __init__(self, data):
-            _, numModels, _ = struct.unpack("<3H", data[:6]) # Header
+            _, \
+            numModels, \
+            _ = struct.unpack(
+                            "<3H", 
+                            data[:6]
+                        ) # Header
             offset = 6 # Position after header
             self.models = {}
 
             for _ in range(numModels):
-                modelNameSize, = struct.unpack("<H", data[offset:offset + 2])
+                modelNameSize, = struct.unpack(
+                                        "<H", 
+                                        data[offset:offset + 2]
+                                    )
                 offset += 2
                 modelName, \
                 _, \
@@ -572,16 +615,33 @@ class FieldModule:
                 _, \
                 lightColor3, \
                 _, \
-                globalLightColor = struct.unpack("<{}sH8s4sH3s6s3s6s3s6s3s".format(modelNameSize), data[offset:offset + modelNameSize + 46])
+                globalLightColor = struct.unpack(
+                                        "<{}sH8s4sH3s6s3s6s3s6s3s".format(modelNameSize), 
+                                        data[offset:offset + modelNameSize + 46]
+                                    )
                 offset += modelNameSize + 46
                 anim = []
                 for _ in range(numAnim):
-                    animNameSize, = struct.unpack("<H", data[offset:offset + 2])
+                    animNameSize, = struct.unpack(
+                                        "<H", 
+                                        data[offset:offset + 2]
+                                    )
                     offset += 2
-                    animFile, = struct.unpack("<{}s".format(animNameSize), data[offset:offset + animNameSize])
+                    animFile, = struct.unpack(
+                                    "<{}s".format(animNameSize), 
+                                    data[offset:offset + animNameSize]
+                                )
                     offset += animNameSize + 2 # There are 2 unused bytes at the end of each animation
                     anim.append(os.path.splitext(animFile.decode("utf-8"))[0] + ".a")
-                model = self.Model(modelName.decode("utf-8"), skeletonFile.decode("utf-8"), lightColor1, lightColor2, lightColor3, globalLightColor, anim)
+                model = self.Model(
+                    modelName.decode("utf-8"), 
+                    skeletonFile.decode("utf-8"), 
+                    lightColor1, 
+                    lightColor2, 
+                    lightColor3, 
+                    globalLightColor, 
+                    anim
+                )
                 self.models[modelName.decode("utf-8")] = model
 
         @property
@@ -820,27 +880,46 @@ class HRCSkeleton:
             numUnknown3, \
             numHundreds, \
             numGroups, \
-            numBoundingBoxes = struct.unpack("<Q13L", data[:60])
+            numBoundingBoxes = struct.unpack(
+                                    "<Q13L", 
+                                    data[:60]
+                                )
             offset = 128 # Header is 128 bytes long
             
-            vertices_list = list(struct.unpack("<{}f".format(3 * numVertices), data[offset:offset + 12 * numVertices]))
+            vertices_list = list(struct.unpack(
+                                    "<{}f".format(3 * numVertices), 
+                                    data[offset:offset + 12 * numVertices]
+                                )
+                            )
             it = iter(vertices_list)
             vertices = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
             vertices = [(x, -z, y) for x, y, z in vertices] # Converting coordinates between FF7's referential and Blender's
             offset += 12 * numVertices
             
-            normals_list = list(struct.unpack("<{}f".format(3 * numNormals), data[offset:offset + 12 * numNormals]))
+            normals_list = list(struct.unpack(
+                                    "<{}f".format(3 * numNormals), 
+                                    data[offset:offset + 12 * numNormals]
+                                )
+                            )
             it = iter(normals_list)
             normals = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z vertices
             normals = [(x, -z, y) for x, y, z in normals] # Converting coordinates between FF7's referential and Blender's
             offset += 12 * numNormals + 12 * numUnknown1 # Avoiding unknown block
 
-            texCoords_list = list(struct.unpack("<{}f".format(2 * numTexCoords), data[offset:offset + 8 * numTexCoords]))
+            texCoords_list = list(struct.unpack(
+                                    "<{}f".format(2 * numTexCoords), 
+                                    data[offset:offset + 8 * numTexCoords]
+                                )
+                            )
             it = iter(texCoords_list)
-            texCoords = list(zip(it, it)) # Tex coords are tuples of X and Y coordinates
+            texCoords = [Vector((u, v)) for u, v in zip(it, it)] # Tex coords are tuples of U and V coordinates
             offset += 8 * numTexCoords
             
-            vertexColors_list = list(struct.unpack("<{}c".format(4 * numVertexColors), data[offset:offset + 4 * numVertexColors]))
+            vertexColors_list = list(struct.unpack(
+                                        "<{}c".format(4 * numVertexColors), 
+                                        data[offset:offset + 4 * numVertexColors]
+                                    )
+                                )
             it = iter(vertexColors_list)
             vertexColors = [
                 (
@@ -863,7 +942,11 @@ class HRCSkeleton:
             # edges = list(struct.unpack("<{}I".format(numEdges), data[offset:offset + 4 * numEdges]))
             offset += 4 * numEdges
             
-            polygons_list = list(struct.unpack("<{}H".format(12 * numPolys), data[offset:offset + 24 * numPolys]))
+            polygons_list = list(struct.unpack(
+                                    "<{}H".format(12 * numPolys), 
+                                    data[offset:offset + 24 * numPolys]
+                                )
+                            )
             it = iter(polygons_list)
             polygons = [
                 { 
@@ -893,7 +976,11 @@ class HRCSkeleton:
             ]
             offset += 24 * numPolys + 24 * numUnknown2 + 3 * numUnknown3 + 100 * numHundreds # Avoiding Unknown2, Unknown3 and Hundreds
             
-            groups_list = list(struct.unpack("<{}L".format(14 * numGroups), data[offset:offset + 56 * numGroups]))
+            groups_list = list(struct.unpack(
+                                "<{}L".format(14 * numGroups), 
+                                data[offset:offset + 56 * numGroups]
+                            )
+                        )
             it = iter(groups_list)
             groups = [
                 {
@@ -937,7 +1024,8 @@ class HRCSkeleton:
             self.polygonGroups = []
             for group in groups:
                 polys = []
-                gr_polygons = polygons[group["polygonStartIndex"]:group["polygonStartIndex"] + group["numPolygons"]] # Selecting group's polygons
+                # Selecting group's polygons
+                gr_polygons = polygons[group["polygonStartIndex"]:group["polygonStartIndex"] + group["numPolygons"]] 
                 for polygon in gr_polygons:
                     # Adding vertices
                     vert1 = { 
@@ -964,7 +1052,7 @@ class HRCSkeleton:
                     polys.append((vert1, vert2, vert3))
                 
                 self.polygonGroups.append({ 
-                    "polygons":polys, 
+                    "polygons":polys,
                     "textureFile":textureFiles[group["textureNumber"]] if group["areTexturesUsed"] else None
                 })
             
@@ -1015,7 +1103,10 @@ class HRCSkeleton:
             _, \
             _, \
             bitsPerPixel, \
-            bytesPerPixel = struct.unpack("<27L", data[:108])
+            bytesPerPixel = struct.unpack(
+                                "<27L", 
+                                data[:108]
+                            )
             offset = 108 # Header is 108 bytes long
 
             # Every image in FF7 is supposed to be paletted, but you never know...
@@ -1040,18 +1131,28 @@ class HRCSkeleton:
                 redMax, \
                 greenMax, \
                 blueMax, \
-                alphaMax = struct.unpack("<20L", data[offset:offset + 80])
+                alphaMax = struct.unpack(
+                                "<20L", 
+                                data[offset:offset + 80]
+                            )
 
             offset += 80
 
             colorKeyArrayFlag, \
             _, \
-            referenceAlpha = struct.unpack("<3L", data[offset:offset + 12])
+            referenceAlpha = struct.unpack(
+                                "<3L", 
+                                data[offset:offset + 12]
+                            )
             offset += 48 # Skipping unused bytes
 
             if paletteFlag:
                 # Palette data
-                paletteData_list = list(struct.unpack("<{}c".format(4 * paletteSize), data[offset:offset + 4 * paletteSize]))
+                paletteData_list = list(struct.unpack(
+                                            "<{}c".format(4 * paletteSize), 
+                                            data[offset:offset + 4 * paletteSize]
+                                        )
+                                    )
                 it = iter(paletteData_list)
                 paletteData = [
                     (
@@ -1073,7 +1174,10 @@ class HRCSkeleton:
             offset += self.width * self.height * bytesPerPixel
 
             if colorKeyFlag and colorKeyArrayFlag:
-                colorKeyArray = struct.unpack("<{}c".format(numPalettes), data[offset:offset + numPalettes])
+                colorKeyArray = struct.unpack(
+                                    "<{}c".format(numPalettes), 
+                                    data[offset:offset + numPalettes]
+                                )
             else:
                 colorKeyArray = None
 
@@ -1141,7 +1245,15 @@ class HRCSkeleton:
 class Animation:
     def __init__(self, data):
         self.frames = []
-        _, numFrames, self.numBones, firstRotation, secondRotation, thirdRotation = struct.unpack("<3I3c", data[:15])
+        _, \
+        numFrames, \
+        self.numBones, \
+        firstRotation, \
+        secondRotation, \
+        thirdRotation = struct.unpack(
+                            "<3I3c", 
+                            data[:15]
+                        )
         offset = 36 # Header's size
         # Converting rotations to X / Y / Z letters
         firstRotation = chr(int.from_bytes(firstRotation, byteorder="little") + 88)
@@ -1152,11 +1264,23 @@ class Animation:
 
         # Getting all frames info
         for _ in range(numFrames):
-            rootRotation = list(struct.unpack("<3f", data[offset:offset + 12]))
+            rootRotation = list(struct.unpack(
+                                    "<3f",
+                                    data[offset:offset + 12]
+                                )
+                            )
             offset += 12
-            rootTranslation = list(struct.unpack("<3f", data[offset:offset + 12]))
+            rootTranslation = list(struct.unpack(
+                                        "<3f", 
+                                        data[offset:offset + 12]
+                                    )
+                                )
             offset += 12
-            rotations_list = list(struct.unpack("<{}f".format(self.numBones * 3), data[offset:offset + self.numBones * 12]))
+            rotations_list = list(struct.unpack(
+                                        "<{}f".format(self.numBones * 3), 
+                                        data[offset:offset + self.numBones * 12]
+                                    )
+                                )
             it = iter(rotations_list)
             rotations = list(zip(it, it, it)) # Creating a list of tuples containing X,Y,Z rotations
             offset += self.numBones * 12
@@ -1299,11 +1423,6 @@ def importLgp(context, filepath):
                     )
                     scene.collection.objects.link(meshObj)
 
-                    # Defining vertex colors
-                    vertexColor = meshData.vertex_colors.new(
-                        name="{}_col".format(meshData.name)
-                    )
-
                     # Creating the UV Map
                     uv_layer = meshData.uv_layers.new(
                         name="{}_uv".format(meshData.name)
@@ -1313,6 +1432,8 @@ def importLgp(context, filepath):
 
                     # Array of BMesh vertices, used to avoid duplicates
                     verts = {}
+                    vertexColors = {}
+                    vertexUV = {}
 
                     # Getting information from polygons, 
                     for polygon in polygonGroup["polygons"]:
@@ -1320,54 +1441,61 @@ def importLgp(context, filepath):
                             vert1 = bm.verts.new(polygon[0]["vertex"])
                             vert1.normal = Vector(polygon[0]["normal"])
 
+                            # Mandatory functions after inserting vertices
+                            bm.verts.index_update()
+                            bm.verts.ensure_lookup_table()
+
                             verts[polygon[0]["vertex"]] = vert1
+                            vertexColors[vert1.index] = polygon[0]["color"]
+                            vertexUV[vert1.index] = polygon[0]["uv"]
                         else:
-                            vert1 = [polygon[0]["vertex"]]
+                            vert1 = verts[polygon[0]["vertex"]]
 
                         if polygon[1]["vertex"] not in verts:
                             vert2 = bm.verts.new(polygon[1]["vertex"])
                             vert2.normal = Vector(polygon[1]["normal"])
 
+                            # Mandatory functions after inserting vertices
+                            bm.verts.index_update()
+                            bm.verts.ensure_lookup_table()
+
                             verts[polygon[1]["vertex"]] = vert2
+                            vertexColors[vert2.index] = polygon[1]["color"]
+                            vertexUV[vert2.index] = polygon[1]["uv"]
                         else:
-                            vert2 = [polygon[1]["vertex"]]
+                            vert2 = verts[polygon[1]["vertex"]]
 
                         if polygon[2]["vertex"] not in verts:
                             vert3 = bm.verts.new(polygon[2]["vertex"])
                             vert3.normal = Vector(polygon[2]["normal"])
 
-                            verts[polygon[2]["vertex"]] = vert3
-                        else:
-                            vert3 = [polygon[2]["vertex"]]
-                    
-                        # Mandatory functions after inserting vertices
-                        bm.verts.index_update()
-                        bm.verts.ensure_lookup_table()
+                            # Mandatory functions after inserting vertices
+                            bm.verts.index_update()
+                            bm.verts.ensure_lookup_table()
 
+                            verts[polygon[2]["vertex"]] = vert3
+                            vertexColors[vert3.index] = polygon[2]["color"]
+                            vertexUV[vert3.index] = polygon[2]["uv"]
+                        else:
+                            vert3 = verts[polygon[2]["vertex"]]
+                    
                         # Defining a face (= polygon in FF7) for the mesh
                         bm.faces.new((vert1, vert2, vert3))
                         bm.faces.index_update()
                         bm.faces.ensure_lookup_table()
 
+                    # Defining Vertex colors and UV
+                    color_layer = bm.loops.layers.color.new("{}_col".format(meshData.name))
+                    uv_layer = bm.loops.layers.uv.new("{}_uv".format(meshData.name))
+                    for face in bm.faces:
+                        for loop in face.loops:
+                            loop[color_layer] = vertexColors[loop.vert.index]
+                            if polygonGroup["textureFile"]:
+                                loop[uv_layer].uv = vertexUV[loop.vert.index]
+
                     # Putting information from bmesh to mesh
                     bm.to_mesh(meshData)
                     bm.free()
-                    
-                    k = 0
-                    for poly in meshData.polygons:
-                        for _ in poly.loop_indices:
-                            vertexColor.data[k].color = (
-                                polygon[poly.index]["color"][0], 
-                                polygon[poly.index]["color"][1], 
-                                polygon[poly.index]["color"][2], 
-                                polygon[poly.index]["color"][3]
-                            )
-                            k += 1
-
-                    
-                    for loop in meshData.loops:
-                        if polygon[loop.index]["uv"]:
-                            uv_layer.data[loop.index].uv = polygon[loop.index]["uv"]
 
                     # Creating image (= texture) and attach it to a material
                     if polygonGroup["textureFile"]:
@@ -1389,7 +1517,7 @@ def importLgp(context, filepath):
                         meshes[bone.name].append(meshObj)
 
         # Adding armature to the scene
-        armatureData = bpy.data.armatures.new(name=model["skeleton"].name+"_root") # The Armature will represent the root bone for transformation purposes
+        armatureData = bpy.data.armatures.new(name=model["skeleton"].name + "_root") # The Armature will represent the root bone for transformation purposes
         armatureObj = bpy.data.objects.new(name=model["skeleton"].name, object_data=armatureData)
         viewLayer.active_layer_collection.collection.objects.link(armatureObj)
         armatureObj.select_set(True)
