@@ -1234,7 +1234,11 @@ def importLgp(context, filepath):
             if not skeletonFile in models:
                 # We don't have the skeleton yet, we need to create it with an empty animations set
                 try:
-                    skeleton = HRCSkeleton(os.path.splitext(skeletonFile)[0], charLGP.getFileContent(skeletonFile), charLGP)
+                    skeleton = HRCSkeleton(
+                        os.path.splitext(skeletonFile)[0], 
+                        charLGP.getFileContent(skeletonFile), 
+                        charLGP
+                    )
                 except Exception as e:
                     print("Error creating HRCSkeleton {} : {}".format(skeletonFile, e))
                     raise
@@ -1285,69 +1289,104 @@ def importLgp(context, filepath):
                 continue
             for pFile in bone.pFiles:
                 for i, polygonGroup in enumerate(pFile.polygonGroups):
-                    # Creating image (= texture) and attach it to a material
-                    image = None
-                    if polygonGroup["textureFile"]:
-                        image = bpy.data.images.new("{}_{}_tex".format(bone.name,i), width=polygonGroup["textureFile"].width, height=polygonGroup["textureFile"].height, alpha=True)
-                        image.source = "GENERATED"
-                        image.file_format = "BMP"
-                        image.pixels = polygonGroup["textureFile"].pixels
-                        # TODO : Create material
+                    # Creating a mesh for the current polygon group and linking it to the current scene
+                    meshData = bpy.data.meshes.new(
+                        "{}_{}".format(bone.name,i)
+                    )
+                    meshObj = bpy.data.objects.new(
+                        "{}_mesh".format(meshData.name), 
+                        meshData
+                    )
+                    scene.collection.objects.link(meshObj)
 
-                    # Creating meshes
-                    for j, polygon in enumerate(polygonGroup["polygons"]):
-                        # Creating a mesh for the current polygon and linking it to the current scene
-                        meshData = bpy.data.meshes.new("{}_{}_{}".format(bone.name,i,j))
-                        meshObj = bpy.data.objects.new("{}_mesh".format(meshData.name), meshData)
-                        scene.collection.objects.link(meshObj)
-                        
-                        # We'll use bmesh to define the mesh
-                        bm = bmesh.new()
-                        
-                        # Defining vertices and normals
-                        vert1 = bm.verts.new(polygon[0]["vertex"])
-                        vert1.normal = Vector(polygon[0]["normal"])
-                        vert2 = bm.verts.new(polygon[1]["vertex"])
-                        vert2.normal = Vector(polygon[1]["normal"])
-                        vert3 = bm.verts.new(polygon[2]["vertex"])
-                        vert3.normal = Vector(polygon[2]["normal"])
-                        
+                    # Defining vertex colors
+                    vertexColor = meshData.vertex_colors.new(
+                        name="{}_col".format(meshData.name)
+                    )
+
+                    # Creating the UV Map
+                    uv_layer = meshData.uv_layers.new(
+                        name="{}_uv".format(meshData.name)
+                    )
+
+                    bm = bmesh.new()
+
+                    # Array of BMesh vertices, used to avoid duplicates
+                    verts = {}
+
+                    # Getting information from polygons, 
+                    for polygon in polygonGroup["polygons"]:
+                        if polygon[0]["vertex"] not in verts:
+                            vert1 = bm.verts.new(polygon[0]["vertex"])
+                            vert1.normal = Vector(polygon[0]["normal"])
+
+                            verts[polygon[0]["vertex"]] = vert1
+                        else:
+                            vert1 = [polygon[0]["vertex"]]
+
+                        if polygon[1]["vertex"] not in verts:
+                            vert2 = bm.verts.new(polygon[1]["vertex"])
+                            vert2.normal = Vector(polygon[1]["normal"])
+
+                            verts[polygon[1]["vertex"]] = vert2
+                        else:
+                            vert2 = [polygon[1]["vertex"]]
+
+                        if polygon[2]["vertex"] not in verts:
+                            vert3 = bm.verts.new(polygon[2]["vertex"])
+                            vert3.normal = Vector(polygon[2]["normal"])
+
+                            verts[polygon[2]["vertex"]] = vert3
+                        else:
+                            vert3 = [polygon[2]["vertex"]]
+                    
                         # Mandatory functions after inserting vertices
                         bm.verts.index_update()
                         bm.verts.ensure_lookup_table()
 
-                        # Definining faces for the polygon
+                        # Defining a face (= polygon in FF7) for the mesh
                         bm.faces.new((vert1, vert2, vert3))
                         bm.faces.index_update()
                         bm.faces.ensure_lookup_table()
 
-                        # Putting information from bmesh to mesh
-                        bm.to_mesh(meshData)
-                        bm.free()
+                    # Putting information from bmesh to mesh
+                    bm.to_mesh(meshData)
+                    bm.free()
+                    
+                    k = 0
+                    for poly in meshData.polygons:
+                        for _ in poly.loop_indices:
+                            vertexColor.data[k].color = (
+                                polygon[poly.index]["color"][0], 
+                                polygon[poly.index]["color"][1], 
+                                polygon[poly.index]["color"][2], 
+                                polygon[poly.index]["color"][3]
+                            )
+                            k += 1
 
-                        # Defining vertex colors
-                        vertexColor = meshData.vertex_colors.new(name="{}_col".format(meshData.name))
-                        i = 0
-                        for poly in meshData.polygons:
-                            for _ in poly.loop_indices:
-                                vertexColor.data[i].color = (polygon[poly.index]["color"][0], polygon[poly.index]["color"][1], polygon[poly.index]["color"][2], polygon[poly.index]["color"][3])
-                                i += 1
+                    
+                    for loop in meshData.loops:
+                        if polygon[loop.index]["uv"]:
+                            uv_layer.data[loop.index].uv = polygon[loop.index]["uv"]
 
-                        # Creating the UV Map
-                        uv_layer = meshData.uv_layers.new(name="{}_uv".format(meshData.name))
-                        for loop in meshData.loops:
-                            if polygon[loop.index]["uv"]:
-                                uv_layer.data[loop.index].uv = polygon[loop.index]["uv"]
+                    # Creating image (= texture) and attach it to a material
+                    if polygonGroup["textureFile"]:
+                        image = bpy.data.images.new(
+                            "{}_{}_tex".format(bone.name,i), 
+                            width=polygonGroup["textureFile"].width, 
+                            height=polygonGroup["textureFile"].height, 
+                            alpha=True
+                        )
+                        image.source = "GENERATED"
+                        image.file_format = "BMP"
+                        image.pixels = polygonGroup["textureFile"].pixels
+                        # TODO : Create material and associate it to mesh
 
-                        if image:
-                            # TODO : Add material to mesh
-                            pass
-
-                        # Storing the mesh object to link it later to the corresponding bone
-                        if bone.name not in meshes:
-                            meshes[bone.name] = [meshObj]
-                        else:
-                            meshes[bone.name].append(meshObj)
+                    # Storing the mesh object to link it later to the corresponding bone
+                    if bone.name not in meshes:
+                        meshes[bone.name] = [meshObj]
+                    else:
+                        meshes[bone.name].append(meshObj)
 
         # Adding armature to the scene
         armatureData = bpy.data.armatures.new(name=model["skeleton"].name+"_root") # The Armature will represent the root bone for transformation purposes
