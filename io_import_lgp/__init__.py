@@ -1423,11 +1423,6 @@ def importLgp(context, filepath):
                     )
                     scene.collection.objects.link(meshObj)
 
-                    # Creating the UV Map
-                    uv_layer = meshData.uv_layers.new(
-                        name="{}_uv".format(meshData.name)
-                    )
-
                     bm = bmesh.new()
 
                     # Array of BMesh vertices, used to avoid duplicates
@@ -1496,6 +1491,18 @@ def importLgp(context, filepath):
                     # Putting information from bmesh to mesh
                     bm.to_mesh(meshData)
                     bm.free()
+
+                    # Copying Vertex Colors to Material
+                    vertMat = bpy.data.materials.new("{}_vertMat")
+                    vertMat.use_nodes = True
+                    nodeTree = vertMat.node_tree
+                    nodes = nodeTree.nodes
+                    bsdf = nodes.get("Principled BSDF")
+                    assert(bsdf)
+                    vertCol = nodes.new(type="ShaderNodeVertexColor")
+                    vertCol.layer_name = "{}_col".format(meshData.name)
+                    nodeTree.links.new(vertCol.outputs[0], bsdf.inputs[0])
+                    meshData.materials.append(vertMat)
 
                     # Creating image (= texture) and attach it to a material
                     if polygonGroup["textureFile"]:
