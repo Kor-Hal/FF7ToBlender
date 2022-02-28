@@ -1403,6 +1403,7 @@ def importLgp(context, filepath):
             scene = bpy.data.scenes.new(SKELETONS_NAMES[model["skeleton"].filename])
         else:
             scene = bpy.data.scenes.new(model["skeleton"].filename)
+        scene.render.image_settings.color_mode = "RGBA"
         bpy.context.window.scene = scene
         viewLayer = bpy.context.view_layer
 
@@ -1493,19 +1494,30 @@ def importLgp(context, filepath):
                     bm.free()
 
                     # Copying Vertex Colors to Material
-                    vertMat = bpy.data.materials.new("{}_vertMat")
+                    vertMat = bpy.data.materials.new("{}_vertMat".format(meshData.name))
                     vertMat.use_nodes = True
+                    vertMat.blend_method = "BLEND"
+                    vertMat.preview_render_type = "FLAT"
+                    vertMat.shadow_method = "NONE"
+
                     nodeTree = vertMat.node_tree
                     nodes = nodeTree.nodes
                     bsdf = nodes.get("Principled BSDF")
                     assert(bsdf)
+
                     vertCol = nodes.new(type="ShaderNodeVertexColor")
                     vertCol.layer_name = "{}_col".format(meshData.name)
-                    nodeTree.links.new(vertCol.outputs[0], bsdf.inputs[0])
+
+                    nodeTree.links.new(vertCol.outputs[0], bsdf.inputs[0]) # Linking output to Base Color in BSDF
+
                     meshData.materials.append(vertMat)
 
                     # Creating image (= texture) and attach it to a material
                     if polygonGroup["textureFile"]:
+                        if int(scene.render.image_settings.color_depth) < polygonGroup["textureFile"].bitDepth:
+                            if polygonGroup["textureFile"].bitDepth in (8,10,12,16,32):
+                                scene.render.image_settings.color_depth = str(polygonGroup["textureFile"].bitDepth)
+
                         image = bpy.data.images.new(
                             "{}_{}_tex".format(bone.name,i), 
                             width=polygonGroup["textureFile"].width, 
@@ -1515,7 +1527,29 @@ def importLgp(context, filepath):
                         image.source = "GENERATED"
                         image.file_format = "BMP"
                         image.pixels = polygonGroup["textureFile"].pixels
-                        # TODO : Create material and associate it to mesh
+
+                        texMat = bpy.data.materials.new("{}_texMat".format(meshData.name))
+                        texMat.use_nodes = True
+                        texMat.blend_method = "BLEND"
+                        texMat.preview_render_type = "FLAT"
+                        texMat.shadow_method = "NONE"
+
+                        nodeTree = texMat.node_tree
+                        nodes = nodeTree.nodes
+                        bsdf = nodes.get("Principled BSDF")
+                        assert(bsdf)
+
+                        imageTex = nodes.new(type="ShaderNodeTexImage")
+                        imageTex.image = image
+
+                        uvMap = nodes.new(type="ShaderNodeUVMap")
+                        uvMap.uv_map = "{}_uv".format(meshData.name)
+
+                        nodeTree.links.new(uvMap.outputs[0], imageTex.inputs[0]) # Linking UV to Vector
+                        nodeTree.links.new(imageTex.outputs[0], bsdf.inputs[0]) # Linking Image Color to Base Color in BSDF
+                        nodeTree.links.new(imageTex.outputs[1], bsdf.inputs[21]) # Linking Image Alpha to Alpha in BSDF
+
+                        meshData.materials.append(texMat)
 
                     # Storing the mesh object to link it later to the corresponding bone
                     if bone.name not in meshes:
@@ -1581,11 +1615,13 @@ def importLgp(context, filepath):
             break # TODO : Remove this, only for debugging purposes
             
         # Set the space to Vertex mode to display colors
+        # and setting the viewport shading to Material
         for area in bpy.data.workspaces['Layout'].screens[0].areas:
             if area.type == 'VIEW_3D':
                 for space in area.spaces:
                     if space.type == 'VIEW_3D':
                         space.shading.color_type = 'VERTEX'
+                        space.shading.type = "MATERIAL"
     return {'FINISHED'}
 
 # Code taken from Blender import template
