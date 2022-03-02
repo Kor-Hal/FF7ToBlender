@@ -1011,7 +1011,7 @@ class HRCSkeleton:
                     textureNumber 
                 in zip(it, it, it, it, it, it, it, it, it, it, it, it, it, it)
             ]
-            offset += 56 * numGroups + 4
+            offset += 56 * numGroups + 4 # There are 4 garbage bytes
             
             # Uncomment this section if needed
             # boundingBoxes_list = list(struct.unpack("<{}f".format(6 * numBoundingBoxes), data[offset:offset + 24 * numBoundingBoxes]))
@@ -1475,10 +1475,11 @@ def importLgp(context, filepath):
                         else:
                             vert3 = verts[polygon[2]["vertex"]]
                     
-                        # Defining a face (= polygon in FF7) for the mesh
-                        bm.faces.new((vert1, vert2, vert3))
-                        bm.faces.index_update()
-                        bm.faces.ensure_lookup_table()
+                        # Defining a face (= polygon in FF7) for the mesh if it doesn't already exist
+                        if not bm.faces.get((vert1, vert2, vert3)):
+                            bm.faces.new((vert1, vert2, vert3))
+                            bm.faces.index_update()
+                            bm.faces.ensure_lookup_table()
 
                     # Defining Vertex colors and UV
                     color_layer = bm.loops.layers.color.new("{}_col".format(meshData.name))
@@ -1492,25 +1493,6 @@ def importLgp(context, filepath):
                     # Putting information from bmesh to mesh
                     bm.to_mesh(meshData)
                     bm.free()
-
-                    # Copying Vertex Colors to Material
-                    vertMat = bpy.data.materials.new("{}_vertMat".format(meshData.name))
-                    vertMat.use_nodes = True
-                    vertMat.blend_method = "BLEND"
-                    vertMat.preview_render_type = "FLAT"
-                    vertMat.shadow_method = "NONE"
-
-                    nodeTree = vertMat.node_tree
-                    nodes = nodeTree.nodes
-                    bsdf = nodes.get("Principled BSDF")
-                    assert(bsdf)
-
-                    vertCol = nodes.new(type="ShaderNodeVertexColor")
-                    vertCol.layer_name = "{}_col".format(meshData.name)
-
-                    nodeTree.links.new(vertCol.outputs[0], bsdf.inputs[0]) # Linking output to Base Color in BSDF
-
-                    meshData.materials.append(vertMat)
 
                     # Creating image (= texture) and attach it to a material
                     if polygonGroup["textureFile"]:
@@ -1550,6 +1532,25 @@ def importLgp(context, filepath):
                         nodeTree.links.new(imageTex.outputs[1], bsdf.inputs[21]) # Linking Image Alpha to Alpha in BSDF
 
                         meshData.materials.append(texMat)
+                    else:
+                        # Copying Vertex Colors to Material
+                        vertMat = bpy.data.materials.new("{}_vertMat".format(meshData.name))
+                        vertMat.use_nodes = True
+                        vertMat.blend_method = "OPAQUE"
+                        vertMat.preview_render_type = "FLAT"
+                        vertMat.shadow_method = "NONE"
+
+                        nodeTree = vertMat.node_tree
+                        nodes = nodeTree.nodes
+                        bsdf = nodes.get("Principled BSDF")
+                        assert(bsdf)
+
+                        vertCol = nodes.new(type="ShaderNodeVertexColor")
+                        vertCol.layer_name = "{}_col".format(meshData.name)
+
+                        nodeTree.links.new(vertCol.outputs[0], bsdf.inputs[0]) # Linking output to Base Color in BSDF
+
+                        meshData.materials.append(vertMat)
 
                     # Storing the mesh object to link it later to the corresponding bone
                     if bone.name not in meshes:
@@ -1616,12 +1617,14 @@ def importLgp(context, filepath):
             
         # Set the space to Vertex mode to display colors
         # and setting the viewport shading to Material
-        for area in bpy.data.workspaces['Layout'].screens[0].areas:
-            if area.type == 'VIEW_3D':
+        for area in bpy.data.workspaces["Layout"].screens[0].areas:
+            if area.type == "VIEW_3D":
                 for space in area.spaces:
-                    if space.type == 'VIEW_3D':
-                        space.shading.color_type = 'VERTEX'
+                    if space.type == "VIEW_3D":
+                        space.shading.color_type = "VERTEX"
                         space.shading.type = "MATERIAL"
+                        space.overlay.show_bones = False
+                        space.overlay.show_relationship_lines = False
     return {'FINISHED'}
 
 # Code taken from Blender import template
