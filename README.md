@@ -1,8 +1,10 @@
+## This project has been discountinued and is deprecated. Kept only as information.
+
 # FF7ToBlender
- Addon to import/export FF7 animation files into/out of Blender
+Addon to import/export FF7 animation files into/out of Blender
 
 ## Prerequisites
-Blender 2.8+
+Blender 2.8+ (not compatible with versions 3 and later of Blender)
 
 ## Installation
 Place the io_import_lgp folder in your Blender's addons folder.
